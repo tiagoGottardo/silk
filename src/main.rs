@@ -93,8 +93,8 @@ async fn videos_interface(
     let menu_items = videos;
     let mut selected = 0;
 
+    terminal.clear()?;
     loop {
-        terminal.clear()?;
         terminal.draw(|f| {
             let size = f.area();
             let block = Block::default()
@@ -165,8 +165,9 @@ async fn search_interface() -> Result<(), fantoccini::error::CmdError> {
     let mut terminal = Terminal::new(backend)?;
 
     let mut input = String::new();
+
+    terminal.clear()?;
     loop {
-        terminal.clear()?;
         terminal.draw(|f| {
             let size = f.area();
             let block = Block::default()
@@ -234,8 +235,8 @@ async fn main() -> Result<(), fantoccini::error::CmdError> {
     let menu_items = vec!["Search", "Exit"];
     let mut selected = 0;
 
+    terminal.clear()?;
     loop {
-        terminal.clear()?;
         terminal.draw(|f| {
             let size = f.area();
             let items: Vec<ListItem> = menu_items
