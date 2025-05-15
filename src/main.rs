@@ -1,4 +1,8 @@
-use fantoccini::{ClientBuilder, Locator};
+use std::error::Error;
+use std::process::Command;
+use std::time::Duration;
+
+use headless_chrome::Browser;
 use ratatui::widgets::{Block, Borders, List, ListItem};
 use ratatui::{
     Terminal,
@@ -12,9 +16,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::Paragraph,
 };
-use serde_json::{Value, json};
-use std::process::Command;
-use std::time::Duration;
+use regex::Regex;
 
 #[allow(dead_code)]
 #[derive(Clone)]
@@ -25,65 +27,42 @@ struct VideoInfo {
 }
 
 #[allow(dead_code)]
-async fn search_youtube_video(str: &str) -> Result<Vec<VideoInfo>, fantoccini::error::CmdError> {
-    let caps = match json!({
-        "moz:firefoxOptions": {
-            "args": ["-headless"]
-        }
-    }) {
-        Value::Object(map) => map,
-        _ => panic!("esperado objeto JSON"),
-    };
+async fn search_youtube_video(str: &str) -> Result<Vec<VideoInfo>, Box<dyn Error>> {
+    let browser = Browser::default()?;
+    let tab = browser.new_tab()?;
 
-    let c = ClientBuilder::native()
-        .capabilities(caps)
-        .connect("http://localhost:4444")
-        .await
-        .expect("failed to connect to WebDriver");
+    tab.navigate_to("https://www.youtube.com/")?;
+    tab.wait_for_element("input.ytSearchboxComponentInput")?
+        .click()?;
+    tab.type_str(&urlencoding::encode(str))?
+        .press_key("Enter")?;
 
-    c.goto(
-        format!(
-            "https://www.youtube.com/results?search_query={}",
-            urlencoding::encode(str)
-        )
-        .as_str(),
-    )
-    .await?;
-
-    c.wait()
-        .for_element(Locator::Css(r#"a#video-title"#))
-        .await?;
-
+    tab.wait_for_element("a#video-title")?;
     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    let elements = tab.wait_for_elements("a#video-title")?;
 
-    let results = c.find_all(Locator::Css("a#video-title")).await?;
+    let video_result_regex =
+        Regex::new(r#"<a[^>]*id="video-title"[^>]*title="([^"]+)"[^>]*href="([^"]+)""#).unwrap();
 
-    let mut video_options: Vec<VideoInfo> = Vec::new();
+    let mut videos: Vec<VideoInfo> = Vec::new();
 
-    for (_, el) in results.iter().enumerate().take(10) {
-        let title = el.text().await.unwrap_or_else(|_| "No title".to_string());
+    for element in elements {
+        for cap in video_result_regex.captures_iter(&element.get_content()?) {
+            let title = &cap[1];
+            let href = &cap[2];
 
-        let href = el
-            .attr("href")
-            .await
-            .unwrap_or(Some("No href".into()))
-            .unwrap();
-
-        video_options.push(VideoInfo {
-            title,
-            channel: String::new(),
-            url: href,
-        });
+            videos.push(VideoInfo {
+                title: title.to_string(),
+                channel: String::new(),
+                url: href.to_string(),
+            })
+        }
     }
 
-    c.close().await?;
-
-    Ok(video_options)
+    Ok(videos)
 }
 
-async fn videos_interface(
-    videos: Vec<VideoInfo>,
-) -> Result<VideoInfo, fantoccini::error::CmdError> {
+async fn videos_interface(videos: Vec<VideoInfo>) -> Result<VideoInfo, Box<dyn Error>> {
     enable_raw_mode()?;
     let mut stdout = std::io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
@@ -157,7 +136,7 @@ async fn videos_interface(
     }
 }
 
-async fn search_interface() -> Result<(), fantoccini::error::CmdError> {
+async fn search_interface() -> Result<(), Box<dyn Error>> {
     enable_raw_mode()?;
     let mut stdout = std::io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
@@ -226,7 +205,7 @@ async fn search_interface() -> Result<(), fantoccini::error::CmdError> {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), fantoccini::error::CmdError> {
+async fn main() -> Result<(), Box<dyn Error>> {
     enable_raw_mode()?;
     let stdout = std::io::stdout();
     let backend = CrosstermBackend::new(stdout);
