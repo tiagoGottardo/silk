@@ -108,11 +108,27 @@ async fn videos_interface(
             let lines: Vec<Line> = menu_items
                 .iter()
                 .enumerate()
-                .map(|(i, v)| {
+                .flat_map(|(i, v)| {
                     if i == selected {
-                        Line::from(vec![Span::raw(format!("> {}", v.title))])
+                        [
+                            Line::from(vec![Span::styled(
+                                format!("> {}\n", v.title),
+                                Style::default()
+                                    .fg(Color::Yellow)
+                                    .add_modifier(Modifier::BOLD),
+                            )]),
+                            Line::from(vec![Span::styled(
+                                format!("  {}", v.channel),
+                                Style::default()
+                                    .fg(Color::Yellow)
+                                    .add_modifier(Modifier::BOLD),
+                            )]),
+                        ]
                     } else {
-                        Line::from(vec![Span::raw(&v.title)])
+                        [
+                            Line::from(vec![Span::raw(format!("  {}\n", v.title))]),
+                            Line::from(vec![Span::raw(format!("  {}", v.channel))]),
+                        ]
                     }
                 })
                 .collect();
@@ -127,32 +143,22 @@ async fn videos_interface(
         if event::poll(Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
                 match key.code {
-                    KeyCode::Up => {
+                    KeyCode::Up | KeyCode::Char('k') => {
                         if selected > 0 {
                             selected -= 1;
                         }
                     }
-                    KeyCode::Down => {
+                    KeyCode::Down | KeyCode::Char('j') => {
                         if selected < menu_items.len() - 1 {
                             selected += 1;
                         }
                     }
-                    KeyCode::Char(c) if c == 'j' => {
-                        if selected < menu_items.len() - 1 {
-                            selected += 1;
-                        }
+                    KeyCode::Char('q') => exit(terminal)?,
+                    KeyCode::Char('h') => {
+                        return Ok(None);
                     }
-                    KeyCode::Char(c) if c == 'k' => {
-                        if selected > 0 {
-                            selected -= 1;
-                        }
-                    }
-                    KeyCode::Enter => {
-                        disable_raw_mode()?;
-                        execute!(terminal.backend_mut(), LeaveAlternateScreen,)?;
-                        terminal.show_cursor()?;
-
-                        return Ok(menu_items[selected].clone());
+                    KeyCode::Enter | KeyCode::Char('l') => {
+                        return Ok(Some(menu_items[selected].clone()));
                     }
                     _ => {}
                 }
@@ -244,7 +250,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 .enumerate()
                 .map(|(i, item)| {
                     if i == selected {
-                        ListItem::new(format!("> {}", item))
+                        ListItem::new(Line::from(vec![Span::styled(
+                            format!("> {}\n", item),
+                            Style::default()
+                                .fg(Color::Yellow)
+                                .add_modifier(Modifier::BOLD),
+                        )]))
                     } else {
                         ListItem::new(format!("  {}", item))
                     }
@@ -262,20 +273,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
         if event::poll(Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
                 match key.code {
-                    KeyCode::Up => {
-                        if selected > 0 {
-                            selected -= 1;
-                        }
+                    KeyCode::Up | KeyCode::Char('k') if selected > 0 => selected -= 1,
+                    KeyCode::Down | KeyCode::Char('j') if selected < menu_items.len() - 1 => {
+                        selected += 1
                     }
-                    KeyCode::Down => {
-                        if selected < menu_items.len() - 1 {
-                            selected += 1;
-                        }
-                    }
-                    KeyCode::Enter if menu_items[selected] == "Exit" => break,
-                    KeyCode::Enter if menu_items[selected] == "Search" => {
-                        search_interface().await?;
-                        return Ok(());
+                    KeyCode::Enter | KeyCode::Char('l') if menu_items[selected] == "Exit" => break,
+                    KeyCode::Enter | KeyCode::Char('l') if menu_items[selected] == "Search" => {
+                        search_interface(&mut terminal).await?
                     }
                     KeyCode::Char('q') => break,
                     _ => {}
