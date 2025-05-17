@@ -1,9 +1,3 @@
-use std::error::Error;
-use std::process::Command;
-use std::time::Duration;
-
-use headless_chrome::Browser;
-use ratatui::widgets::{Block, Borders, List, ListItem};
 use ratatui::{
     Terminal,
     crossterm::{
@@ -14,9 +8,15 @@ use ratatui::{
     prelude::CrosstermBackend,
     style::{Color, Style},
     text::{Line, Span},
-    widgets::Paragraph,
+    widgets::{Block, Borders, List, ListItem, Paragraph},
 };
 use regex::Regex;
+use serde_json::Value;
+use std::{
+    error::Error,
+    process::{self, Command},
+    time::Duration,
+};
 
 #[allow(dead_code)]
 #[derive(Clone)]
@@ -26,40 +26,65 @@ struct VideoInfo {
     url: String,
 }
 
-#[allow(dead_code)]
-async fn search_youtube_video(str: &str) -> Result<Vec<VideoInfo>, Box<dyn Error>> {
-    let browser = Browser::default()?;
-    let tab = browser.new_tab()?;
+fn remove_quotes(s: String) -> String {
+    let mut chars = s.chars();
+    chars.next();
+    let mut s = chars.as_str().to_owned();
+    s.pop().unwrap();
+    s
+}
 
-    tab.navigate_to("https://www.youtube.com/")?;
-    tab.wait_for_element("input.ytSearchboxComponentInput")?
-        .click()?;
-    tab.type_str(&urlencoding::encode(str))?
-        .press_key("Enter")?;
+async fn fetch_video_titles(query: &str) -> Result<Vec<VideoInfo>, String> {
+    let url = format!("https://www.youtube.com/results?search_query={}", query);
 
-    tab.wait_for_element("a#video-title")?;
-    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-    let elements = tab.wait_for_elements("a#video-title")?;
+    let client = reqwest::Client::builder()
+        .user_agent("Mozilla/5.0")
+        .build()
+        .unwrap();
 
-    let video_result_regex =
-        Regex::new(r#"<a[^>]*id="video-title"[^>]*title="([^"]+)"[^>]*href="([^"]+)""#).unwrap();
+    let res = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|_| String::from(""))?
+        .text()
+        .await
+        .map_err(|_| String::from(""))?;
 
-    let mut videos: Vec<VideoInfo> = Vec::new();
+    let re = Regex::new(r"var ytInitialData = (\{.*?\});</script>").unwrap();
+    let caps = re.captures(&res).ok_or("ytInitialData not found")?;
+    let json: Value = serde_json::from_str(&caps[1]).unwrap();
 
-    for element in elements {
-        for cap in video_result_regex.captures_iter(&element.get_content()?) {
-            let title = &cap[1];
-            let href = &cap[2];
+    let contents = json["contents"]["twoColumnSearchResultsRenderer"]
+        ["primaryContents"]["sectionListRenderer"]["contents"][0]
+        ["itemSectionRenderer"]["contents"]
+        .as_array()
+        .ok_or("Content not found")?;
 
-            videos.push(VideoInfo {
-                title: title.to_string(),
-                channel: String::new(),
-                url: href.to_string(),
-            })
-        }
-    }
+    let result = contents
+        .iter()
+        .take(13)
+        .filter_map(|e| {
+            if let Some(video) = e.get("videoRenderer") {
+                let title = remove_quotes(video["title"]["runs"][0]["text"].to_string());
+                let url = remove_quotes(
+                    video["navigationEndpoint"]["commandMetadata"]["webCommandMetadata"]["url"]
+                        .to_string(),
+                );
+                let channel = remove_quotes(video["ownerText"]["runs"][0]["text"].to_string());
 
-    Ok(videos)
+                return Some(VideoInfo {
+                    title,
+                    url,
+                    channel,
+                });
+            }
+
+            None
+        })
+        .collect::<Vec<VideoInfo>>();
+
+    Ok(result)
 }
 
 async fn videos_interface(videos: Vec<VideoInfo>) -> Result<VideoInfo, Box<dyn Error>> {
@@ -174,7 +199,7 @@ async fn search_interface() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    let video_selected = videos_interface(search_youtube_video(input.as_str()).await?).await?;
+    let video_selected = videos_interface(fetch_video_titles(input.as_str()).await?).await?;
 
     let output = Command::new("yt-dlp")
         .args([
