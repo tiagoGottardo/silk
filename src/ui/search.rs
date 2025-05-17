@@ -1,7 +1,10 @@
-use std::{error::Error, io::Stdout, process::Command, thread::sleep, time::Duration};
+use std::{error::Error, io::Stdout};
 
 type Terminal = ratatui::Terminal<CrosstermBackend<Stdout>>;
 
+use super::videos;
+use crate::youtube::play_video;
+use crate::youtube::search_fetch;
 use ratatui::{
     crossterm::event::{self, Event, KeyCode},
     prelude::CrosstermBackend,
@@ -9,10 +12,6 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
 };
-
-use super::videos;
-
-use crate::youtube::search_fetch;
 
 pub async fn search_interface(terminal: &mut Terminal) -> Result<(), Box<dyn Error>> {
     let mut input = String::new();
@@ -52,33 +51,7 @@ pub async fn search_interface(terminal: &mut Terminal) -> Result<(), Box<dyn Err
     )
     .await?
     {
-        terminal.clear()?;
-        terminal.draw(|f| f.render_widget(Span::raw(" Video Loading..."), f.area()))?;
-        terminal.hide_cursor()?;
-
-        let output = Command::new("yt-dlp")
-            .args([
-                "-f",
-                "best[ext=mp4]/best",
-                "-g",
-                &format!("www.youtube.com{}", video_selected.url),
-            ])
-            .output()?;
-
-        if !output.status.success() {
-            eprintln!("yt-dlp failed: {}", String::from_utf8_lossy(&output.stderr));
-            return Ok(());
-        }
-
-        let stream_url = String::from_utf8_lossy(&output.stdout).trim().to_string();
-
-        Command::new("sh")
-            .arg("-c")
-            .arg(format!("mpv '{}' > /dev/null & clear", stream_url))
-            .status()?;
-
-        sleep(Duration::from_secs(3));
-        terminal.autoresize()?;
+        play_video::play_video(terminal, &video_selected.url).await?;
     }
 
     Ok(())
