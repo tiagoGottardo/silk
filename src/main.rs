@@ -201,6 +201,10 @@ async fn search_interface() -> Result<(), Box<dyn Error>> {
 
     let video_selected = videos_interface(fetch_video_titles(input.as_str()).await?).await?;
 
+    terminal.clear()?;
+    terminal.draw(|f| f.render_widget(Span::raw(" Video Loading..."), f.area()))?;
+    terminal.hide_cursor()?;
+
     let output = Command::new("yt-dlp")
         .args([
             "-f",
@@ -217,16 +221,16 @@ async fn search_interface() -> Result<(), Box<dyn Error>> {
 
     let stream_url = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
-    Command::new("sh")
-        .arg("-c")
-        .arg(format!("mpv '{}' & disown", stream_url))
-        .status()?;
-
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     terminal.show_cursor()?;
 
-    Ok(())
+    Command::new("sh")
+        .arg("-c")
+        .arg(format!("mpv '{}' > /dev/null & clear", stream_url))
+        .status()?;
+
+    process::exit(0);
 }
 
 #[tokio::main]
