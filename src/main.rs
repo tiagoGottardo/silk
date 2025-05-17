@@ -1,12 +1,11 @@
 use ratatui::{
-    Terminal,
     crossterm::{
-        event::{self, EnableMouseCapture, Event, KeyCode},
+        event::{self, Event, KeyCode},
         execute,
-        terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+        terminal::{LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
     },
     prelude::CrosstermBackend,
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Paragraph},
 };
@@ -14,9 +13,13 @@ use regex::Regex;
 use serde_json::Value;
 use std::{
     error::Error,
+    io::{self, Stdout},
     process::{self, Command},
+    thread::sleep,
     time::Duration,
 };
+
+type Terminal = ratatui::Terminal<CrosstermBackend<Stdout>>;
 
 #[allow(dead_code)]
 #[derive(Clone)]
@@ -87,13 +90,10 @@ async fn fetch_video_titles(query: &str) -> Result<Vec<VideoInfo>, String> {
     Ok(result)
 }
 
-async fn videos_interface(videos: Vec<VideoInfo>) -> Result<VideoInfo, Box<dyn Error>> {
-    enable_raw_mode()?;
-    let mut stdout = std::io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-
+async fn videos_interface(
+    terminal: &mut Terminal,
+    videos: Vec<VideoInfo>,
+) -> Result<Option<VideoInfo>, Box<dyn Error>> {
     let menu_items = videos;
     let mut selected = 0;
 
@@ -161,13 +161,7 @@ async fn videos_interface(videos: Vec<VideoInfo>) -> Result<VideoInfo, Box<dyn E
     }
 }
 
-async fn search_interface() -> Result<(), Box<dyn Error>> {
-    enable_raw_mode()?;
-    let mut stdout = std::io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-
+async fn search_interface(terminal: &mut Terminal) -> Result<(), Box<dyn Error>> {
     let mut input = String::new();
 
     terminal.clear()?;
@@ -199,46 +193,44 @@ async fn search_interface() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    let video_selected = videos_interface(fetch_video_titles(input.as_str()).await?).await?;
+    if let Some(video_selected) =
+        videos_interface(terminal, fetch_video_titles(input.as_str()).await?).await?
+    {
+        terminal.clear()?;
+        terminal.draw(|f| f.render_widget(Span::raw(" Video Loading..."), f.area()))?;
+        terminal.hide_cursor()?;
 
-    terminal.clear()?;
-    terminal.draw(|f| f.render_widget(Span::raw(" Video Loading..."), f.area()))?;
-    terminal.hide_cursor()?;
+        let output = Command::new("yt-dlp")
+            .args([
+                "-f",
+                "best[ext=mp4]/best",
+                "-g",
+                &format!("www.youtube.com{}", video_selected.url),
+            ])
+            .output()?;
 
-    let output = Command::new("yt-dlp")
-        .args([
-            "-f",
-            "best[ext=mp4]/best",
-            "-g",
-            &format!("www.youtube.com{}", video_selected.url),
-        ])
-        .output()?;
+        if !output.status.success() {
+            eprintln!("yt-dlp failed: {}", String::from_utf8_lossy(&output.stderr));
+            return Ok(());
+        }
 
-    if !output.status.success() {
-        eprintln!("yt-dlp failed: {}", String::from_utf8_lossy(&output.stderr));
-        return Ok(());
+        let stream_url = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+        Command::new("sh")
+            .arg("-c")
+            .arg(format!("mpv '{}' > /dev/null & clear", stream_url))
+            .status()?;
+
+        sleep(Duration::from_secs(3));
+        terminal.autoresize()?;
     }
 
-    let stream_url = String::from_utf8_lossy(&output.stdout).trim().to_string();
-
-    disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-    terminal.show_cursor()?;
-
-    Command::new("sh")
-        .arg("-c")
-        .arg(format!("mpv '{}' > /dev/null & clear", stream_url))
-        .status()?;
-
-    process::exit(0);
+    Ok(())
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    enable_raw_mode()?;
-    let stdout = std::io::stdout();
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
+    let mut terminal = init()?;
 
     let menu_items = vec!["Search", "Exit"];
     let mut selected = 0;
@@ -292,9 +284,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    exit(&mut terminal)?;
+
+    Ok(())
+}
+
+fn init() -> Result<Terminal, io::Error> {
+    enable_raw_mode()?;
+    let stdout = std::io::stdout();
+    let backend = CrosstermBackend::new(stdout);
+    let terminal = Terminal::new(backend)?;
+
+    Ok(terminal)
+}
+
+fn exit(terminal: &mut Terminal) -> Result<(), io::Error> {
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     terminal.show_cursor()?;
 
-    Ok(())
+    process::exit(0);
 }
