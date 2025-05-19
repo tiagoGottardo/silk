@@ -10,7 +10,10 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
 };
 
-use crate::terminal;
+use crate::{
+    terminal,
+    youtube::download::{DownloadType, download_from_yt},
+};
 
 use crate::types::VideoInfo;
 
@@ -67,6 +70,12 @@ pub async fn videos_interface(
         if event::poll(Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
                 match key.code {
+                    KeyCode::Char('d') => {
+                        download_from_yt(&menu_items[selected].url, DownloadType::Video)?
+                    }
+                    KeyCode::Char('m') => {
+                        download_from_yt(&menu_items[selected].url, DownloadType::Audio)?
+                    }
                     KeyCode::Up | KeyCode::Char('k') => {
                         if selected > 0 {
                             selected -= 1;
