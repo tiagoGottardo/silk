@@ -1,4 +1,9 @@
-use std::{error::Error, io::Stdout, time::Duration};
+use std::{
+    error::Error,
+    io::Stdout,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 type Terminal = ratatui::Terminal<CrosstermBackend<Stdout>>;
 
@@ -9,6 +14,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
 };
+use tokio::task;
 
 use crate::{
     terminal,
@@ -21,7 +27,7 @@ pub async fn videos_interface(
     terminal: &mut Terminal,
     videos: Vec<VideoInfo>,
 ) -> Result<Option<VideoInfo>, Box<dyn Error>> {
-    let menu_items = videos;
+    let menu_items = Arc::new(Mutex::new(videos));
     let mut selected = 0;
 
     terminal.clear()?;
@@ -33,17 +39,25 @@ pub async fn videos_interface(
                 .borders(Borders::ALL);
 
             let lines: Vec<Line> = menu_items
+                .lock()
+                .unwrap()
                 .iter()
                 .enumerate()
                 .flat_map(|(i, v)| {
                     if i == selected {
                         [
-                            Line::from(vec![Span::styled(
-                                format!("> {}\n", v.title),
-                                Style::default()
-                                    .fg(Color::Yellow)
-                                    .add_modifier(Modifier::BOLD),
-                            )]),
+                            Line::from(vec![
+                                Span::styled(
+                                    format!("> {}\n", v.title),
+                                    Style::default()
+                                        .fg(Color::Yellow)
+                                        .add_modifier(Modifier::BOLD),
+                                ),
+                                Span::styled(
+                                    format!(" {}\n", v.tag),
+                                    Style::default().fg(Color::Blue),
+                                ),
+                            ]),
                             Line::from(vec![Span::styled(
                                 format!("  {}", v.channel),
                                 Style::default()
@@ -53,7 +67,13 @@ pub async fn videos_interface(
                         ]
                     } else {
                         [
-                            Line::from(vec![Span::raw(format!("  {}\n", v.title))]),
+                            Line::from(vec![
+                                Span::raw(format!("  {}\n", v.title)),
+                                Span::styled(
+                                    format!(" {}\n", v.tag),
+                                    Style::default().fg(Color::Blue),
+                                ),
+                            ]),
                             Line::from(vec![Span::raw(format!("  {}", v.channel))]),
                         ]
                     }
@@ -71,10 +91,52 @@ pub async fn videos_interface(
             if let Event::Key(key) = event::read()? {
                 match key.code {
                     KeyCode::Char('d') => {
-                        download_from_yt(&menu_items[selected].url, DownloadType::Video)?
+                        let chosen = selected;
+
+                        {
+                            let mut items = menu_items.lock().unwrap();
+                            items[chosen].tag = String::from("Downloading...");
+                        }
+
+                        let menu_items_clone = Arc::clone(&menu_items);
+                        let url = {
+                            let items = menu_items.lock().unwrap();
+                            items[chosen].url.clone()
+                        };
+
+                        task::spawn(async move {
+                            let result = download_from_yt(&url, DownloadType::Video).await;
+
+                            let mut items = menu_items_clone.lock().unwrap();
+                            items[chosen].tag = match result {
+                                Ok(_) => String::from("Downloaded!"),
+                                Err(_) => String::from("Some error occurred on download."),
+                            };
+                        });
                     }
                     KeyCode::Char('m') => {
-                        download_from_yt(&menu_items[selected].url, DownloadType::Audio)?
+                        let chosen = selected;
+
+                        {
+                            let mut items = menu_items.lock().unwrap();
+                            items[chosen].tag = String::from("Downloading audio...");
+                        }
+
+                        let menu_items_clone = Arc::clone(&menu_items);
+                        let url = {
+                            let items = menu_items.lock().unwrap();
+                            items[chosen].url.clone()
+                        };
+
+                        task::spawn(async move {
+                            let result = download_from_yt(&url, DownloadType::Audio).await;
+
+                            let mut items = menu_items_clone.lock().unwrap();
+                            items[chosen].tag = match result {
+                                Ok(_) => String::from("Audio Downloaded!"),
+                                Err(_) => String::from("Some error occurred on download."),
+                            };
+                        });
                     }
                     KeyCode::Up | KeyCode::Char('k') => {
                         if selected > 0 {
@@ -82,7 +144,7 @@ pub async fn videos_interface(
                         }
                     }
                     KeyCode::Down | KeyCode::Char('j') => {
-                        if selected < menu_items.len() - 1 {
+                        if selected < menu_items.lock().unwrap().len() - 1 {
                             selected += 1;
                         }
                     }
@@ -91,7 +153,7 @@ pub async fn videos_interface(
                         return Ok(None);
                     }
                     KeyCode::Enter | KeyCode::Char('l') => {
-                        return Ok(Some(menu_items[selected].clone()));
+                        return Ok(Some(menu_items.lock().unwrap()[selected].clone()));
                     }
                     _ => {}
                 }

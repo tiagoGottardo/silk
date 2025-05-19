@@ -8,7 +8,7 @@ pub enum DownloadType {
     Audio,
 }
 
-pub fn download_from_yt(url: &str, download_type: DownloadType) -> Result<(), io::Error> {
+pub async fn download_from_yt(url: &str, download_type: DownloadType) -> Result<(), io::Error> {
     let normalized_url = match url {
         u if u.starts_with("http") => u.to_string(),
         u if u.starts_with("/") => format!("https://www.youtube.com{}", url),
@@ -20,13 +20,9 @@ pub fn download_from_yt(url: &str, download_type: DownloadType) -> Result<(), io
         DownloadType::Audio => (AUDIO_DOWNLOAD_PATH, "233"),
     };
 
-    Command::new("sh")
-        .arg("-c")
-        .arg(format!(
-            "yt-dlp -P '{}' -f '{}' '{}' > /dev/null &",
-            path, format, normalized_url
-        ))
-        .status()?;
+    Command::new("yt-dlp")
+        .args(["-P", path, "-f", format, &normalized_url, ">", "/dev/null"])
+        .output()?;
 
     Ok(())
 }
