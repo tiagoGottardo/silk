@@ -54,6 +54,7 @@ pub async fn fetch_video_titles(query: &str) -> Result<Vec<VideoInfo>, String> {
                     title,
                     url,
                     channel,
+                    tag: String::new(),
                 });
             }
 

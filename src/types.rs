@@ -4,4 +4,5 @@ pub struct VideoInfo {
     pub title: String,
     pub channel: String,
     pub url: String,
+    pub tag: String,
 }
