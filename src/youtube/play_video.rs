@@ -9,12 +9,10 @@ pub async fn play_video(terminal: &mut Terminal, url: &str) -> Result<(), Box<dy
     terminal.draw(|f| f.render_widget(Span::raw(" Video Loading..."), f.area()))?;
     terminal.hide_cursor()?;
 
-    let normalized_url = if url.starts_with("http") {
-        url.to_string()
-    } else if url.starts_with("/") {
-        format!("www.youtube.com{}", url)
-    } else {
-        format!("www.youtube.com/{}", url)
+    let normalized_url = match url {
+        u if u.starts_with("http") => u.to_string(),
+        u if u.starts_with("/") => format!("https://www.youtube.com{}", url),
+        _ => format!("https://www.youtube.com/{}", url),
     };
 
     let output = Command::new("yt-dlp")
