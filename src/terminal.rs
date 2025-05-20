@@ -4,6 +4,7 @@ use std::{
 };
 
 type Terminal = ratatui::Terminal<CrosstermBackend<Stdout>>;
+
 use ratatui::{
     crossterm::{
         execute,
