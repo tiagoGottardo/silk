@@ -1,11 +1,6 @@
-use std::error::Error;
-
 use clap::{Parser, Subcommand};
-
-mod terminal;
-mod types;
-mod ui;
-mod youtube;
+use netimp::{terminal, ui, youtube};
+use std::error::Error;
 
 #[derive(Parser)]
 #[command(name = "netimp")]
