@@ -1,15 +1,9 @@
 use regex::Regex;
 use serde_json::Value;
 
-fn remove_quotes(s: String) -> String {
-    let mut chars = s.chars();
-    chars.next();
-    let mut s = chars.as_str().to_owned();
-    s.pop().unwrap();
-    s
-}
-
 use crate::types::VideoInfo;
+
+use super::scraper::parse_video_props;
 
 pub async fn fetch_video_titles(query: &str) -> Result<Vec<VideoInfo>, String> {
     let url = format!("https://www.youtube.com/results?search_query={}", query);
@@ -43,17 +37,12 @@ pub async fn fetch_video_titles(query: &str) -> Result<Vec<VideoInfo>, String> {
         .take(13)
         .filter_map(|e| {
             if let Some(video) = e.get("videoRenderer") {
-                let title = remove_quotes(video["title"]["runs"][0]["text"].to_string());
-                let url = remove_quotes(
-                    video["navigationEndpoint"]["commandMetadata"]["webCommandMetadata"]["url"]
-                        .to_string(),
-                );
-                let channel = remove_quotes(video["ownerText"]["runs"][0]["text"].to_string());
+                let parsed_result = parse_video_props(video);
 
                 return Some(VideoInfo {
-                    title,
-                    url,
-                    channel,
+                    title: parsed_result.title,
+                    url: parsed_result.url,
+                    channel: parsed_result.uploader.username,
                     tag: String::new(),
                 });
             }
