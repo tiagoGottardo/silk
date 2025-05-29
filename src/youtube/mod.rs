@@ -1,4 +1,4 @@
 pub mod download;
+pub mod parser;
 pub mod play_video;
-pub mod scraper;
 pub mod search_fetch;
