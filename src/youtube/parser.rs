@@ -1,9 +1,9 @@
 use regex::Regex;
 use serde_json::Value;
 
-pub enum ItemRenderer {
+pub enum ContentItem {
     Video(VideoProps),
-    Channel,
+    Channel(ChannelProps),
     Playlist,
 }
 
@@ -24,6 +24,15 @@ pub struct Uploader {
     pub id: String,
     pub username: String,
     pub verified: bool,
+}
+
+pub struct ChannelProps {
+    pub uploader: Uploader,
+    pub url: String,
+    pub snippet: Option<String>,
+    pub thumbnail_src: Option<String>,
+    pub video_count: Option<String>,
+    pub subscriber_count: Option<String>,
 }
 
 fn remove_quotes(s: String) -> String {
@@ -56,34 +65,72 @@ fn parse_views(s: String) -> i64 {
         .expect(&format!("it should be valid number: {s}"))
 }
 
-pub fn take_n_video_props(items: Vec<ItemRenderer>, n: usize) -> Vec<VideoProps> {
-    items
-        .into_iter()
-        .filter_map(|e| match e {
-            ItemRenderer::Video(video_props) => Some(video_props),
-            _ => None,
-        })
-        .take(n)
-        .collect::<Vec<VideoProps>>()
-}
-
-pub fn parse_contents(contents: Vec<Value>) -> Vec<ItemRenderer> {
+pub fn parse_contents(contents: Vec<Value>) -> Vec<ContentItem> {
     contents
         .iter()
         .filter_map(|item| {
             if !item["videoRenderer"].is_null() {
-                Some(ItemRenderer::Video(parse_video_props(
+                Some(ContentItem::Video(parse_video_props(
                     item["videoRenderer"].clone(),
                 )))
             } else if !item["channelRenderer"].is_null() {
-                Some(ItemRenderer::Channel)
+                Some(ContentItem::Channel(parse_channel_props(
+                    item["channelRenderer"].clone(),
+                )))
             } else if !item["lockupViewModel"].is_null() {
-                Some(ItemRenderer::Playlist)
+                Some(ContentItem::Playlist)
             } else {
                 None
             }
         })
-        .collect::<Vec<ItemRenderer>>()
+        .collect::<Vec<ContentItem>>()
+}
+
+pub fn parse_channel_props(renderer: Value) -> ChannelProps {
+    ChannelProps {
+        uploader: Uploader {
+            id: remove_quotes(renderer["channelId"].to_string()),
+            username: remove_quotes(renderer["title"]["simpleText"].to_string()),
+            verified: renderer["ownerBadges"]
+                .as_array()
+                .unwrap_or(&Vec::new())
+                .iter()
+                .any(|badge| {
+                    badge["metadataBadgeRenderer"]["style"]
+                        .to_string()
+                        .contains("VERIFIED")
+                }),
+        },
+        url: format!(
+            "https://www.youtube.com{}",
+            remove_quotes(
+                renderer["navigationEndpoint"]["commandMetadata"]["webCommandMetadata"]["url"]
+                    .to_string()
+            )
+        ),
+        snippet: renderer["descriptionSnippet"]["runs"]
+            .as_array()
+            .unwrap_or(&Vec::new())
+            .iter()
+            .map(|e| e["text"].to_string())
+            .reduce(|a, b| format!("{a} {b}")),
+        thumbnail_src: renderer["thumbnail"]["thumbnails"]
+            .as_array()
+            .map(|e| e.last().map(|e2| remove_quotes(e2["url"].to_string())))
+            .unwrap_or(None),
+        video_count: renderer["videoCountText"]["runs"]
+            .as_array()
+            .map(|e| {
+                e.iter()
+                    .map(|a| a["text"].to_string())
+                    .reduce(|a, b| format!("{a} {b}"))
+            })
+            .unwrap_or(None),
+        subscriber_count: match renderer["subscriberCountText"].clone() {
+            Value::Null => None,
+            value => Some(remove_quotes(value["simpleText"].to_string())),
+        },
+    }
 }
 
 pub fn parse_video_props(renderer: Value) -> VideoProps {
