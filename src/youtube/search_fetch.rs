@@ -26,7 +26,7 @@ pub async fn fetch_video_titles(query: &str) -> Result<Vec<VideoInfo>, String> {
         .map(|video_props| VideoInfo {
             title: video_props.title,
             url: video_props.url,
-            channel: video_props.uploader.username,
+            channel: video_props.uploader,
             tag: String::new(),
         })
         .collect::<Vec<VideoInfo>>();

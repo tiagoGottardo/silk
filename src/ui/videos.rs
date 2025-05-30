@@ -59,7 +59,7 @@ pub async fn videos_interface(
                                 ),
                             ]),
                             Line::from(vec![Span::styled(
-                                format!("  {}", v.channel),
+                                format!("  {}", v.channel.username),
                                 Style::default()
                                     .fg(Color::Yellow)
                                     .add_modifier(Modifier::BOLD),
@@ -74,7 +74,7 @@ pub async fn videos_interface(
                                     Style::default().fg(Color::Blue),
                                 ),
                             ]),
-                            Line::from(vec![Span::raw(format!("  {}", v.channel))]),
+                            Line::from(vec![Span::raw(format!("  {}", v.channel.username))]),
                         ]
                     }
                 })

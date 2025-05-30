@@ -19,6 +19,7 @@ pub struct VideoProps {
     pub uploader: Uploader,
 }
 
+#[derive(Clone)]
 pub struct Uploader {
     pub id: String,
     pub username: String,
