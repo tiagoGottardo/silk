@@ -1,4 +1,6 @@
-use super::parser::{ContentItem, extract_contents_from_yt_page, parse_contents};
+use crate::types::ContentItem;
+
+use super::parser::{extract_contents_from_yt_page, parse_contents};
 
 pub async fn fetch_video_titles(query: &str) -> Result<Vec<ContentItem>, String> {
     let url = format!("https://www.youtube.com/results?search_query={}", query);

@@ -17,10 +17,8 @@ use ratatui::{
 
 use crate::{
     terminal,
-    youtube::{
-        download::{DownloadType, download_from_yt},
-        parser::{ContentItem, VideoProps},
-    },
+    types::{ContentItem, VideoProps},
+    youtube::download::{DownloadType, download_from_yt},
 };
 
 async fn download_on_menu(
