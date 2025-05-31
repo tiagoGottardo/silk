@@ -98,6 +98,7 @@ pub fn parse_channel_props(renderer: Value) -> ChannelProps {
             Value::Null => None,
             value => Some(remove_quotes(value["simpleText"].to_string())),
         },
+        tag: String::new(),
     }
 }
 

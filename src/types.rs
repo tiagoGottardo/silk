@@ -12,6 +12,7 @@ impl ContentItem {
     pub fn display(&self, selected: bool) -> Vec<Line> {
         match self {
             ContentItem::Video(video_props) => video_props.display(selected),
+            ContentItem::Channel(channel_props) => channel_props.display(selected),
             _ => vec![],
         }
     }
@@ -78,4 +79,24 @@ pub struct ChannelProps {
     pub thumbnail_src: Option<String>,
     pub video_count: Option<String>,
     pub subscriber_count: Option<String>,
+    pub tag: String,
+}
+
+impl ChannelProps {
+    fn display(&self, selected: bool) -> Vec<Line> {
+        if selected {
+            return vec![Line::from(vec![
+                Span::styled(
+                    format!("> {}\n", self.uploader.username),
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(format!(" {}\n", self.tag), Style::default().fg(Color::Blue)),
+            ])];
+        }
+
+        vec![Line::from(vec![
+            Span::raw(format!("  {}\n", self.uploader.username)),
+            Span::styled(format!(" {}\n", self.tag), Style::default().fg(Color::Blue)),
+        ])]
+    }
 }
