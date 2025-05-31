@@ -5,6 +5,7 @@ type Terminal = ratatui::Terminal<CrosstermBackend<Stdout>>;
 use super::videos;
 use crate::youtube::play_video;
 use crate::youtube::search_fetch;
+use ratatui::crossterm::event::KeyEventKind;
 use ratatui::{
     crossterm::event::{self, Event, KeyCode},
     prelude::CrosstermBackend,
@@ -33,6 +34,10 @@ pub async fn search_interface(terminal: &mut Terminal) -> Result<(), Box<dyn Err
         })?;
 
         if let Event::Key(key) = event::read()? {
+            if key.kind != KeyEventKind::Press {
+                continue;
+            }
+
             match key.code {
                 KeyCode::Esc => return Ok(()),
                 KeyCode::Enter => break,

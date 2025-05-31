@@ -8,7 +8,7 @@ use std::{
 type Terminal = ratatui::Terminal<CrosstermBackend<Stdout>>;
 
 use ratatui::{
-    crossterm::event::{self, Event, KeyCode},
+    crossterm::event::{self, Event, KeyCode, KeyEventKind},
     prelude::CrosstermBackend,
     style::{Color, Style},
     text::Line,
@@ -81,6 +81,10 @@ pub async fn videos_interface(
 
         if event::poll(Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
+                if key.kind != KeyEventKind::Press {
+                    continue;
+                }
+
                 match key.code {
                     KeyCode::Char('d') => {
                         download_on_menu(Arc::clone(&menu_items), selected, DownloadType::Video)
