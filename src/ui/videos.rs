@@ -25,12 +25,13 @@ use crate::types::VideoInfo;
 
 pub async fn videos_interface(
     terminal: &mut Terminal,
-    videos: Vec<VideoInfo>,
-) -> Result<Option<VideoInfo>, Box<dyn Error>> {
+    videos: Vec<ContentItem>,
+) -> Result<Option<VideoProps>, Box<dyn Error>> {
     let menu_items = Arc::new(Mutex::new(videos));
     let mut selected = 0;
 
     terminal.clear()?;
+
     loop {
         terminal.draw(|f| {
             let size = f.area();
@@ -38,46 +39,12 @@ pub async fn videos_interface(
                 .title(" Youtube but good! (Videos) ")
                 .borders(Borders::ALL);
 
+            let menu_items = menu_items.lock().unwrap();
+
             let lines: Vec<Line> = menu_items
-                .lock()
-                .unwrap()
                 .iter()
                 .enumerate()
-                .flat_map(|(i, v)| {
-                    if i == selected {
-                        [
-                            Line::from(vec![
-                                Span::styled(
-                                    format!("> {}\n", v.title),
-                                    Style::default()
-                                        .fg(Color::Yellow)
-                                        .add_modifier(Modifier::BOLD),
-                                ),
-                                Span::styled(
-                                    format!(" {}\n", v.tag),
-                                    Style::default().fg(Color::Blue),
-                                ),
-                            ]),
-                            Line::from(vec![Span::styled(
-                                format!("  {}", v.channel.username),
-                                Style::default()
-                                    .fg(Color::Yellow)
-                                    .add_modifier(Modifier::BOLD),
-                            )]),
-                        ]
-                    } else {
-                        [
-                            Line::from(vec![
-                                Span::raw(format!("  {}\n", v.title)),
-                                Span::styled(
-                                    format!(" {}\n", v.tag),
-                                    Style::default().fg(Color::Blue),
-                                ),
-                            ]),
-                            Line::from(vec![Span::raw(format!("  {}", v.channel.username))]),
-                        ]
-                    }
-                })
+                .flat_map(|(i, v)| v.display(i == selected))
                 .collect();
 
             let paragraph = Paragraph::new(lines)
