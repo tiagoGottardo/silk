@@ -3,7 +3,7 @@ use std::{error::Error, io::Stdout, time::Duration};
 type Terminal = ratatui::Terminal<CrosstermBackend<Stdout>>;
 
 use ratatui::{
-    crossterm::event::{self, Event, KeyCode},
+    crossterm::event::{self, Event, KeyCode, KeyEventKind},
     prelude::CrosstermBackend,
     style::{Color, Modifier, Style},
     text::{Line, Span},
@@ -47,6 +47,10 @@ pub async fn menu_interface(terminal: &mut Terminal) -> Result<(), Box<dyn Error
 
         if event::poll(Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
+                if key.kind != KeyEventKind::Press {
+                    continue;
+                }
+
                 match key.code {
                     KeyCode::Up | KeyCode::Char('k') if selected > 0 => selected -= 1,
                     KeyCode::Down | KeyCode::Char('j') if selected < menu_items.len() - 1 => {
