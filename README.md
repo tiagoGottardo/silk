@@ -1,4 +1,5 @@
 # 🎥 YouTube but good! (TUI)
+> **⚠️ Warning:** This project is still under active development and does not yet include all the features we plan to add.
 
 A terminal-based YouTube search and video player built with Rust. Video search using web scraping + `regex`, and playback via `yt-dlp` and `mpv`.
 

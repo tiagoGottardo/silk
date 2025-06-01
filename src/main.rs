@@ -1,9 +1,9 @@
 use clap::{Parser, Subcommand};
-use netimp::{terminal, ui, youtube};
+use silk::{terminal, ui, youtube};
 use std::error::Error;
 
 #[derive(Parser)]
-#[command(name = "netimp")]
+#[command(name = "silk")]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
