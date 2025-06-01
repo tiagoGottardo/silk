@@ -1242,20 +1242,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "netimp"
-version = "0.1.0"
-dependencies = [
- "clap",
- "ratatui",
- "regex",
- "reqwest 0.12.15",
- "rustube",
- "serde_json",
- "tokio",
- "urlencoding",
-]
-
-[[package]]
 name = "num-conv"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1887,6 +1873,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9203b8055f63a2a00e2f593bb0510367fe707d7ff1e5c872de2f537b339e5410"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "silk"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "ratatui",
+ "regex",
+ "reqwest 0.12.15",
+ "rustube",
+ "serde_json",
+ "tokio",
+ "urlencoding",
 ]
 
 [[package]]
