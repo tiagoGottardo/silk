@@ -1,7 +1,6 @@
 use std::{io, process::Command};
 
-const VIDEO_DOWNLOAD_PATH: &str = "~/Videos/";
-const AUDIO_DOWNLOAD_PATH: &str = "~/Music/";
+use crate::config::{AUDIO_DOWNLOAD_PATH, VIDEO_DOWNLOAD_PATH};
 
 pub enum DownloadType {
     Video,
@@ -21,7 +20,7 @@ pub async fn download_from_yt(url: &str, download_type: DownloadType) -> Result<
     };
 
     Command::new("yt-dlp")
-        .args(["-P", path, "-f", format, &normalized_url, ">", "/dev/null"])
+        .args(["-P", path, "-f", format, &normalized_url])
         .output()?;
 
     Ok(())
