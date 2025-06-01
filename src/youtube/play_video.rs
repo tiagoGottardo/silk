@@ -4,6 +4,8 @@ type Terminal = ratatui::Terminal<CrosstermBackend<Stdout>>;
 
 use ratatui::{prelude::CrosstermBackend, text::Span};
 
+use crate::config::play_video_command;
+
 pub async fn play_video(terminal: &mut Terminal, url: &str) -> Result<(), Box<dyn Error>> {
     terminal.clear()?;
     terminal.draw(|f| f.render_widget(Span::raw(" Video Loading..."), f.area()))?;
@@ -26,10 +28,7 @@ pub async fn play_video(terminal: &mut Terminal, url: &str) -> Result<(), Box<dy
 
     let stream_url = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
-    Command::new("sh")
-        .arg("-c")
-        .arg(format!("mpv '{}' > /dev/null & clear", stream_url))
-        .status()?;
+    play_video_command(stream_url)?;
 
     sleep(Duration::from_secs(3));
     terminal.autoresize()?;
