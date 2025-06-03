@@ -5,7 +5,7 @@ use ratatui::text::{Line, Span};
 pub enum ContentItem {
     Video(VideoProps),
     Channel(ChannelProps),
-    Playlist,
+    Playlist(PlaylistProps),
 }
 
 impl ContentItem {
@@ -13,7 +13,7 @@ impl ContentItem {
         match self {
             ContentItem::Video(video_props) => video_props.display(selected),
             ContentItem::Channel(channel_props) => channel_props.display(selected),
-            _ => vec![],
+            ContentItem::Playlist(playlist_props) => playlist_props.display(selected),
         }
     }
 }
@@ -98,5 +98,46 @@ impl ChannelProps {
             Span::raw(format!("  {}\n", self.uploader.username)),
             Span::styled(format!(" {}\n", self.tag), Style::default().fg(Color::Blue)),
         ])]
+    }
+}
+
+#[derive(Clone)]
+pub struct PlaylistProps {
+    pub id: String,
+    pub title: String,
+    pub url: String,
+    pub tag: String,
+    pub uploader: Uploader,
+}
+
+impl PlaylistProps {
+    fn display(&self, selected: bool) -> Vec<Line> {
+        if selected {
+            return vec![
+                Line::from(vec![
+                    Span::styled(
+                        format!("> {}\n", self.title),
+                        Style::default()
+                            .fg(Color::Green)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(format!(" {}\n", self.tag), Style::default().fg(Color::Blue)),
+                ]),
+                Line::from(vec![Span::styled(
+                    format!("  {}", self.uploader.username),
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                )]),
+            ];
+        }
+
+        vec![
+            Line::from(vec![
+                Span::raw(format!("  {}\n", self.title)),
+                Span::styled(format!(" {}\n", self.tag), Style::default().fg(Color::Blue)),
+            ]),
+            Line::from(vec![Span::raw(format!("  {}", self.uploader.username))]),
+        ]
     }
 }
