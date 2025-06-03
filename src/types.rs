@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 
@@ -14,6 +16,20 @@ impl ContentItem {
             ContentItem::Video(video_props) => video_props.display(selected),
             ContentItem::Channel(channel_props) => channel_props.display(selected),
             ContentItem::Playlist(playlist_props) => playlist_props.display(selected),
+        }
+    }
+
+    pub async fn unsubscribe(&mut self) {
+        match self {
+            ContentItem::Video(v) => v.unsubscribe().await,
+            _ => {}
+        }
+    }
+
+    pub async fn subscribe(&mut self) {
+        match self {
+            ContentItem::Video(v) => v.subscribe().await,
+            _ => {}
         }
     }
 }
@@ -56,6 +72,56 @@ impl Video {
             ]),
             Line::from(vec![Span::raw(format!("  {}", self.channel.username))]),
         ]
+    }
+
+    async fn subscribe(&mut self) {
+        let pool = crate::config::db::get();
+        let mut connection = pool.acquire().await.unwrap();
+
+        let result = sqlx::query!(
+            r#"
+                INSERT INTO subscriptions ( channel_id, channel_username ) VALUES ( ?1, ?2 ) "#,
+            self.channel.id,
+            self.channel.username
+        )
+        .execute(&mut *connection)
+        .await;
+
+        let tag = match result {
+            Ok(_) => String::from("Subscribed"),
+            Err(e)
+                if e.as_database_error().map(|e| e.code().unwrap_or_default())
+                    == Some(Cow::Borrowed("1555")) =>
+            {
+                String::from("You're already subscribed to this channel.")
+            }
+            Err(_) => String::from("Some error occur on subscribe"),
+        };
+
+        self.tag = tag;
+    }
+
+    async fn unsubscribe(&mut self) {
+        let pool = crate::config::db::get();
+        let mut connection = pool.acquire().await.unwrap();
+
+        let result = sqlx::query!(
+            r#"
+                DELETE FROM subscriptions WHERE channel_id = ?1;"#,
+            self.channel.id,
+        )
+        .execute(&mut *connection)
+        .await;
+
+        let tag = match result {
+            Ok(e) if e.rows_affected() == 0 => {
+                String::from("You're not subscribed to this channel")
+            }
+            Ok(_) => String::from("Unsubscribed"),
+            Err(_) => String::from("Some error occur on unsubscribe"),
+        };
+
+        self.tag = tag;
     }
 }
 

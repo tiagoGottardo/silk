@@ -99,6 +99,12 @@ pub async fn videos_interface(
                             selected -= 1;
                         }
                     }
+                    KeyCode::Char('s') => {
+                        menu_items.lock().unwrap()[selected].subscribe().await;
+                    }
+                    KeyCode::Char('u') => {
+                        menu_items.lock().unwrap()[selected].unsubscribe().await;
+                    }
                     KeyCode::Down | KeyCode::Char('j') => {
                         if selected < menu_items.lock().unwrap().len() - 1 {
                             selected += 1;
