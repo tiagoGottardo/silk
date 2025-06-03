@@ -1,5 +1,8 @@
 use clap::{Parser, Subcommand};
-use silk::{terminal, ui, youtube};
+use silk::{
+    config::{db, env},
+    terminal, ui, youtube,
+};
 use std::error::Error;
 
 #[derive(Parser)]
@@ -17,8 +20,12 @@ enum Commands {
         url: String,
     },
 }
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    env::Env::init();
+    db::init().await;
+
     let cli = Cli::parse();
 
     let mut terminal = terminal::init()?;
