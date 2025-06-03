@@ -17,7 +17,7 @@ use ratatui::{
 
 use crate::{
     terminal,
-    types::{ContentItem, VideoProps},
+    types::{ContentItem, Video},
     youtube::download::{DownloadType, download_from_yt},
 };
 
@@ -51,7 +51,7 @@ async fn download_on_menu(
 pub async fn videos_interface(
     terminal: &mut Terminal,
     videos: Vec<ContentItem>,
-) -> Result<Option<VideoProps>, Box<dyn Error>> {
+) -> Result<Option<Video>, Box<dyn Error>> {
     let menu_items = Arc::new(Mutex::new(videos));
     let mut selected = 0;
 

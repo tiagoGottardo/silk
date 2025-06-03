@@ -3,9 +3,9 @@ use ratatui::text::{Line, Span};
 
 #[derive(Clone)]
 pub enum ContentItem {
-    Video(VideoProps),
-    Channel(ChannelProps),
-    Playlist(PlaylistProps),
+    Video(Video),
+    Channel(Channel),
+    Playlist(Playlist),
 }
 
 impl ContentItem {
@@ -19,20 +19,15 @@ impl ContentItem {
 }
 
 #[derive(Clone)]
-pub struct VideoProps {
+pub struct Video {
     pub id: String,
     pub title: String,
     pub url: String,
-    pub duration: Option<String>,
-    pub snippet: Option<String>,
-    pub upload_date: Option<String>,
-    pub thumbnail_src: Option<String>,
-    pub views: Option<i64>,
-    pub uploader: Uploader,
     pub tag: String,
+    pub channel: Channel,
 }
 
-impl VideoProps {
+impl Video {
     fn display(&self, selected: bool) -> Vec<Line> {
         if selected {
             return vec![
@@ -46,7 +41,7 @@ impl VideoProps {
                     Span::styled(format!(" {}\n", self.tag), Style::default().fg(Color::Blue)),
                 ]),
                 Line::from(vec![Span::styled(
-                    format!("  {}", self.uploader.username),
+                    format!("  {}", self.channel.username),
                     Style::default()
                         .fg(Color::Yellow)
                         .add_modifier(Modifier::BOLD),
@@ -59,35 +54,25 @@ impl VideoProps {
                 Span::raw(format!("  {}\n", self.title)),
                 Span::styled(format!(" {}\n", self.tag), Style::default().fg(Color::Blue)),
             ]),
-            Line::from(vec![Span::raw(format!("  {}", self.uploader.username))]),
+            Line::from(vec![Span::raw(format!("  {}", self.channel.username))]),
         ]
     }
 }
 
 #[derive(Clone)]
-pub struct Uploader {
+pub struct Channel {
     pub id: String,
     pub username: String,
-    pub verified: bool,
-}
-
-#[derive(Clone)]
-pub struct ChannelProps {
-    pub uploader: Uploader,
     pub url: String,
-    pub snippet: Option<String>,
-    pub thumbnail_src: Option<String>,
-    pub video_count: Option<String>,
-    pub subscriber_count: Option<String>,
     pub tag: String,
 }
 
-impl ChannelProps {
+impl Channel {
     fn display(&self, selected: bool) -> Vec<Line> {
         if selected {
             return vec![Line::from(vec![
                 Span::styled(
-                    format!("> {}\n", self.uploader.username),
+                    format!("> {}\n", self.username),
                     Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(format!(" {}\n", self.tag), Style::default().fg(Color::Blue)),
@@ -95,23 +80,34 @@ impl ChannelProps {
         }
 
         vec![Line::from(vec![
-            Span::raw(format!("  {}\n", self.uploader.username)),
+            Span::raw(format!("  {}\n", self.username)),
             Span::styled(format!(" {}\n", self.tag), Style::default().fg(Color::Blue)),
         ])]
     }
 }
 
 #[derive(Clone)]
-pub struct PlaylistProps {
+pub struct Playlist {
     pub id: String,
     pub title: String,
     pub url: String,
     pub tag: String,
-    pub uploader: Uploader,
+    pub uploader: PlaylistUploader,
 }
 
-impl PlaylistProps {
+#[derive(Clone)]
+pub enum PlaylistUploader {
+    MultiUploaders(String),
+    Channel(Channel),
+}
+
+impl Playlist {
     fn display(&self, selected: bool) -> Vec<Line> {
+        let uploader_username = match &self.uploader {
+            PlaylistUploader::MultiUploaders(username) => username.clone(),
+            PlaylistUploader::Channel(channel) => channel.username.clone(),
+        };
+
         if selected {
             return vec![
                 Line::from(vec![
@@ -124,7 +120,7 @@ impl PlaylistProps {
                     Span::styled(format!(" {}\n", self.tag), Style::default().fg(Color::Blue)),
                 ]),
                 Line::from(vec![Span::styled(
-                    format!("  {}", self.uploader.username),
+                    format!("  {}", uploader_username),
                     Style::default()
                         .fg(Color::Yellow)
                         .add_modifier(Modifier::BOLD),
@@ -137,7 +133,7 @@ impl PlaylistProps {
                 Span::raw(format!("  {}\n", self.title)),
                 Span::styled(format!(" {}\n", self.tag), Style::default().fg(Color::Blue)),
             ]),
-            Line::from(vec![Span::raw(format!("  {}", self.uploader.username))]),
+            Line::from(vec![Span::raw(format!("  {}", uploader_username))]),
         ]
     }
 }
