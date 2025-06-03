@@ -1,7 +1,7 @@
 use regex::Regex;
 use serde_json::Value;
 
-use crate::types::{ChannelProps, ContentItem, Uploader, VideoProps};
+use crate::types::{ChannelProps, ContentItem, PlaylistProps, Uploader, VideoProps};
 
 fn remove_quotes(s: String) -> String {
     let mut chars = s.chars();
@@ -46,7 +46,9 @@ pub fn parse_contents(contents: Vec<Value>) -> Vec<ContentItem> {
                     item["channelRenderer"].clone(),
                 )))
             } else if !item["lockupViewModel"].is_null() {
-                Some(ContentItem::Playlist)
+                Some(ContentItem::Playlist(parse_playlist_props(
+                    item["lockupViewModel"].clone(),
+                )))
             } else {
                 None
             }
@@ -150,6 +152,34 @@ pub fn parse_video_props(renderer: Value) -> VideoProps {
                 }),
         },
         tag: String::new()
+    }
+}
+
+pub fn parse_playlist_props(renderer: Value) -> PlaylistProps {
+    let id = renderer["rendererContext"]["commandContext"]["onTap"]["innertubeCommand"]["commandMetadata"]
+        ["webCommandMetadata"]["url"].to_string();
+
+    PlaylistProps {
+        id: remove_quotes(id.clone()),
+        title: remove_quotes(
+            renderer["metadata"]["lockupMetadataViewModel"]["title"]["content"].to_string(),
+        ),
+        url: format!("https://www.youtube.com{}", remove_quotes(id)),
+        uploader: Uploader {
+            id: remove_first_char(
+                remove_quotes(
+                    renderer["metadata"]["lockupMetadataViewModel"]["metadata"]["contentMetadataViewModel"]["metadataRows"][0]["metadataParts"][0]["text"]["commandRuns"][0]["onTap"]["innertubeCommand"]["browseEndpoint"]["canonicalBaseUrl"]
+                        .to_string(),
+                ),
+            ),
+            username: 
+                remove_quotes(
+                    renderer["metadata"]["lockupMetadataViewModel"]["metadata"]["contentMetadataViewModel"]["metadataRows"][0]["metadataParts"][0]["text"]["content"]
+                        .to_string(),
+                ),
+            verified: false,
+        },
+        tag: String::new(),
     }
 }
 

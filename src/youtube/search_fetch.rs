@@ -21,14 +21,7 @@ pub async fn fetch_video_titles(query: &str) -> Result<Vec<ContentItem>, String>
 
     let contents = extract_contents_from_yt_page(res)?;
 
-    let result = parse_contents(contents)
-        .into_iter()
-        .filter_map(|content_item| match content_item {
-            ContentItem::Playlist => None,
-            rest => Some(rest),
-        })
-        .take(10)
-        .collect();
+    let result = parse_contents(contents).into_iter().take(10).collect();
 
     Ok(result)
 }
