@@ -39,7 +39,7 @@ pub async fn menu_interface(terminal: &mut Terminal) -> Result<(), Box<dyn Error
 
             let list = List::new(items).block(
                 Block::default()
-                    .title(" Youtube but good! ")
+                    .title(" Silk (Home) ")
                     .borders(Borders::ALL),
             );
             f.render_widget(list, size);

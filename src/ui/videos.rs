@@ -61,7 +61,7 @@ pub async fn videos_interface(
         terminal.draw(|f| {
             let size = f.area();
             let block = Block::default()
-                .title(" Youtube but good! (Videos) ")
+                .title(" Silk (Search) ")
                 .borders(Borders::ALL);
 
             let menu_items = menu_items.lock().unwrap();

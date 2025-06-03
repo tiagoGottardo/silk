@@ -24,7 +24,7 @@ pub async fn search_interface(terminal: &mut Terminal) -> Result<(), Box<dyn Err
         terminal.draw(|f| {
             let size = f.area();
             let block = Block::default()
-                .title(" Youtube but good! ")
+                .title(" Silk (Search) ")
                 .borders(Borders::ALL);
 
             let paragraph =
