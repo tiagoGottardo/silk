@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 use silk::{
     config::{db, env},
     terminal, ui,
-    youtube::{self, parser::update_feed},
+    youtube::{self, update_feed},
 };
 
 #[derive(Parser)]
@@ -36,7 +36,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     match cli.command {
         Some(Commands::Open { url }) => {
-            youtube::play_video::play_video(&mut terminal, &url).await?;
+            youtube::play_video(&mut terminal, &url).await?;
         }
         None => {
             ui::main_menu::menu_interface(&mut terminal).await?;

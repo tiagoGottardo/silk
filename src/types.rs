@@ -5,6 +5,11 @@ use chrono::{DateTime, Utc};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 
+pub struct ChannelDB {
+    pub channel_id: String,
+    pub channel_username: String,
+}
+
 #[derive(Clone)]
 pub enum ContentItem {
     Video(Video),

@@ -4,7 +4,7 @@ type Terminal = ratatui::Terminal<CrosstermBackend<Stdout>>;
 
 use super::videos;
 use crate::youtube::play_video;
-use crate::youtube::search_fetch;
+use crate::youtube::search_content;
 use ratatui::crossterm::ExecutableCommand;
 use ratatui::crossterm::cursor;
 use ratatui::crossterm::event::KeyEventKind;
@@ -59,13 +59,10 @@ pub async fn search_interface(terminal: &mut Terminal) -> Result<(), Box<dyn Err
     }
     terminal.hide_cursor()?;
 
-    if let Some(video_selected) = videos::videos_interface(
-        terminal,
-        search_fetch::fetch_video_titles(input.as_str()).await?,
-    )
-    .await?
+    if let Some(video_selected) =
+        videos::videos_interface(terminal, search_content(input.as_str()).await?).await?
     {
-        play_video::play_video(terminal, &video_selected.url).await?;
+        play_video(terminal, &video_selected.url).await?;
     }
 
     Ok(())
