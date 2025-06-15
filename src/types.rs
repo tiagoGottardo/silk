@@ -1,5 +1,7 @@
+use core::fmt;
 use std::borrow::Cow;
 
+use chrono::{DateTime, Utc};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 
@@ -41,6 +43,25 @@ pub struct Video {
     pub url: String,
     pub tag: String,
     pub channel: Channel,
+    pub published_at: DateTime<Utc>,
+}
+
+impl fmt::Display for Video {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Id: {}\n", self.id)?;
+        write!(f, "Title: {}\n", self.title)?;
+        write!(f, "Url: {}\n", self.url)?;
+        write!(f, "Channel:\n")?;
+        write!(f, "  Id: {}\n", self.channel.id)?;
+        write!(f, "  Username: {}\n", self.channel.username)?;
+        write!(f, "  Url: {}\n", self.channel.url)?;
+        write!(f, "Published at: {}\n", self.published_at)?;
+        if !self.tag.is_empty() {
+            write!(f, "Tag: {}\n", self.tag)?;
+        }
+
+        Ok(())
+    }
 }
 
 impl Video {
