@@ -14,4 +14,5 @@ reqwest = "0.12.15"
 clap = { version = "4.5.38", features = ["derive"] }
 sqlx = { version = "0.8.6", features = ["sqlite", "runtime-tokio"]}
 dotenvy = "0.15.7"
+chrono = "0.4.41"
 

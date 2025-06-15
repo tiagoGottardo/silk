@@ -1,9 +1,11 @@
+use std::error::Error;
+
 use clap::{Parser, Subcommand};
 use silk::{
     config::{db, env},
-    terminal, ui, youtube,
+    terminal, ui,
+    youtube::{self, parser::update_feed},
 };
-use std::error::Error;
 
 #[derive(Parser)]
 #[command(name = "silk")]
@@ -25,6 +27,8 @@ enum Commands {
 async fn main() -> Result<(), Box<dyn Error>> {
     env::Env::init();
     db::init().await;
+
+    update_feed().await;
 
     let cli = Cli::parse();
 
