@@ -10,6 +10,15 @@ pub struct ChannelDB {
     pub channel_username: String,
 }
 
+pub struct VideoDB {
+    pub id: String,
+    pub title: String,
+    pub url: String,
+    pub published_at: String,
+    pub channel_id: String,
+    pub channel_username: String,
+}
+
 #[derive(Clone)]
 pub enum ContentItem {
     Video(Video),
@@ -160,6 +169,15 @@ pub struct Channel {
 }
 
 impl Channel {
+    pub fn new(id: &str, username: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            username: username.to_string(),
+            url: format!("https://www.youtube.com/{}", id.to_string()),
+            tag: String::new(),
+        }
+    }
+
     fn display(&self, selected: bool) -> Vec<Line> {
         if selected {
             return vec![Line::from(vec![

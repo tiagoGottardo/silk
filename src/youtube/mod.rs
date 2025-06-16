@@ -2,7 +2,7 @@ use std::{error::Error, io::Stdout, process::Command, thread::sleep, time::Durat
 
 use crate::{
     config::play_video_command,
-    types::{Channel, ChannelDB, ContentItem, Video},
+    types::{Channel, ChannelDB, ContentItem, Video, VideoDB},
     youtube::parser::parse_contents,
 };
 use chrono::{TimeDelta, Utc};
@@ -130,4 +130,43 @@ pub async fn update_feed() {
         .execute(&mut *connection)
         .await;
     }
+}
+
+pub async fn get_feed_videos() -> Result<Vec<ContentItem>, String> {
+    let pool = crate::config::db::get();
+
+    let feed_videos = sqlx::query_as!(
+        VideoDB,
+        r#"
+            SELECT
+            feed.id,
+            feed.title,
+            feed.url,
+            feed.published_at,
+            subscriptions.channel_id,
+            subscriptions.channel_username
+            FROM feed
+            JOIN subscriptions ON feed.channel = subscriptions.channel_id
+            ORDER BY feed.published_at DESC
+            LIMIT 10;
+        "#
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+
+    let feed_videos = feed_videos
+        .into_iter()
+        .map(|e| Video {
+            id: e.id,
+            title: e.title,
+            channel: Channel::new(&e.channel_id, &e.channel_username),
+            published_at: e.published_at.parse().unwrap(),
+            url: format!("https://www.youtube.com/{}", e.url),
+            tag: String::new(),
+        })
+        .map(|video| ContentItem::Video(video))
+        .collect::<Vec<ContentItem>>();
+
+    Ok(feed_videos)
 }

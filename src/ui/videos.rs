@@ -4,7 +4,6 @@ use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
-
 type Terminal = ratatui::Terminal<CrosstermBackend<Stdout>>;
 
 use ratatui::{
@@ -60,9 +59,7 @@ pub async fn videos_interface(
     loop {
         terminal.draw(|f| {
             let size = f.area();
-            let block = Block::default()
-                .title(" Silk (Search) ")
-                .borders(Borders::ALL);
+            let block = Block::default().title(" Silk ").borders(Borders::ALL);
 
             let menu_items = menu_items.lock().unwrap();
 
