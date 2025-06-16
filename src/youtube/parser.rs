@@ -1,7 +1,7 @@
-use regex::Regex;
+use chrono::{DateTime, Duration, Utc};
 use serde_json::Value;
-
-use crate::types::{ChannelProps, ContentItem, Uploader, VideoProps};
+use crate::types::{Channel, ContentItem, Playlist, PlaylistUploader, Video};
+use super::fetch_youtube_content;
 
 fn remove_quotes(s: String) -> String {
     let mut chars = s.chars();
@@ -11,26 +11,53 @@ fn remove_quotes(s: String) -> String {
     s
 }
 
-pub fn extract_contents_from_yt_page(input: String) -> Result<Vec<Value>, String> {
-    let re = Regex::new(r"var ytInitialData = (\{.*?\});</script>").unwrap();
-    let caps = re.captures(&input).ok_or("ytInitialData not found")?;
-    let json: Value =
-        serde_json::from_str(&caps[1]).map_err(|_| String::from("Failed to parse html"))?;
+fn parse_time_published(input: &str) -> Option<DateTime<Utc>> {
+    let splitted = input.split(" ").collect::<Vec<&str>>();
 
-    json["contents"]["twoColumnSearchResultsRenderer"]
-        ["primaryContents"]["sectionListRenderer"]["contents"][0]
-        ["itemSectionRenderer"]["contents"]
-        .as_array()
-            .ok_or(String::from("Content not found")).cloned()
+    if splitted.len() < 3 {
+        return None;
+    }
+
+    let time_passed = match (splitted[1].parse::<i64>().ok(), splitted[2]) {
+        (Some(num), t) if t.starts_with("segundo") => Some(Duration::seconds(num)),
+        (Some(num), t) if t.starts_with("minuto") => Some(Duration::minutes(num)),
+        (Some(num), t) if t.starts_with("hora") => Some(Duration::hours(num)),
+        (Some(num), t) if t.starts_with("dia") => Some(Duration::days(num)),
+        (Some(num), "mês") | (Some(num), "meses") => Some(Duration::days(num * 30)),
+        (Some(num), t) if t.starts_with("ano") => Some(Duration::days(num * 365)),
+        _ => None,
+    };
+
+    time_passed.map(|t| Utc::now() - t)
 }
 
-fn parse_views(s: String) -> i64 {
-    s.split_once(' ')
-        .expect("it should have space char")
-        .0
-        .replace(".", "")
-        .parse::<i64>()
-        .expect(&format!("it should be valid number: {s}"))
+
+pub async fn parse_channel_videos(channel: Channel) -> Result<Vec<Video>, String> {
+    let result = fetch_youtube_content(&format!("{}/videos", &channel.url))
+        .await?
+        ["contents"]
+        ["twoColumnBrowseResultsRenderer"]
+        ["tabs"][1]["tabRenderer"]["content"]
+        ["richGridRenderer"]["contents"]
+        .as_array()
+        .ok_or(format!("Error on parse {} channel videos.", &channel.id))?
+        .into_iter()
+        .flat_map(|e| {
+            let id = remove_quotes(e["richItemRenderer"]["content"]["videoRenderer"]["videoId"].to_string());
+            let title = remove_quotes(e["richItemRenderer"]["content"]["videoRenderer"]["title"]["runs"][0]["text"].to_string());
+            let published_at = parse_time_published(&remove_quotes(e["richItemRenderer"]["content"]["videoRenderer"]["publishedTimeText"]["simpleText"].to_string()));
+
+            published_at.map(|published_at| Video {
+                id: id.clone(),
+                title,
+                channel: channel.clone(),
+                url: format!("https://www.youtube.com/watch?v={id}"),
+                published_at,
+                tag: String::new()
+            })
+        }).collect::<Vec<Video>>();
+
+    Ok(result)
 }
 
 pub fn parse_contents(contents: Vec<Value>) -> Vec<ContentItem> {
@@ -46,7 +73,9 @@ pub fn parse_contents(contents: Vec<Value>) -> Vec<ContentItem> {
                     item["channelRenderer"].clone(),
                 )))
             } else if !item["lockupViewModel"].is_null() {
-                Some(ContentItem::Playlist)
+                Some(ContentItem::Playlist(parse_playlist_props(
+                    item["lockupViewModel"].clone(),
+                )))
             } else {
                 None
             }
@@ -54,21 +83,10 @@ pub fn parse_contents(contents: Vec<Value>) -> Vec<ContentItem> {
         .collect::<Vec<ContentItem>>()
 }
 
-pub fn parse_channel_props(renderer: Value) -> ChannelProps {
-    ChannelProps {
-        uploader: Uploader {
-            id: remove_quotes(renderer["channelId"].to_string()),
-            username: remove_quotes(renderer["title"]["simpleText"].to_string()),
-            verified: renderer["ownerBadges"]
-                .as_array()
-                .unwrap_or(&Vec::new())
-                .iter()
-                .any(|badge| {
-                    badge["metadataBadgeRenderer"]["style"]
-                        .to_string()
-                        .contains("VERIFIED")
-                }),
-        },
+pub fn parse_channel_props(renderer: Value) -> Channel {
+    Channel {
+        id: remove_quotes(renderer["channelId"].to_string()),
+        username: remove_quotes(renderer["title"]["simpleText"].to_string()),
         url: format!(
             "https://www.youtube.com{}",
             remove_quotes(
@@ -76,34 +94,14 @@ pub fn parse_channel_props(renderer: Value) -> ChannelProps {
                     .to_string()
             )
         ),
-        snippet: renderer["descriptionSnippet"]["runs"]
-            .as_array()
-            .unwrap_or(&Vec::new())
-            .iter()
-            .map(|e| e["text"].to_string())
-            .reduce(|a, b| format!("{a} {b}")),
-        thumbnail_src: renderer["thumbnail"]["thumbnails"]
-            .as_array()
-            .map(|e| e.last().map(|e2| remove_quotes(e2["url"].to_string())))
-            .unwrap_or(None),
-        video_count: renderer["videoCountText"]["runs"]
-            .as_array()
-            .map(|e| {
-                e.iter()
-                    .map(|a| a["text"].to_string())
-                    .reduce(|a, b| format!("{a} {b}"))
-            })
-            .unwrap_or(None),
-        subscriber_count: match renderer["subscriberCountText"].clone() {
-            Value::Null => None,
-            value => Some(remove_quotes(value["simpleText"].to_string())),
-        },
         tag: String::new(),
     }
 }
 
-pub fn parse_video_props(renderer: Value) -> VideoProps {
-    VideoProps {
+pub fn parse_video_props(renderer: Value) -> Video {
+    let channel_id = remove_first_char(remove_quotes(renderer["ownerText"]["runs"][0]["navigationEndpoint"]["commandMetadata"]["webCommandMetadata"]["url"].to_string()));
+
+    Video {
         id: remove_quotes(renderer["videoId"].to_string()),
         title: remove_quotes(renderer["title"]["runs"][0]["text"].to_string()),
         url: format!(
@@ -113,43 +111,53 @@ pub fn parse_video_props(renderer: Value) -> VideoProps {
                     .to_string(),
             )
         ),
-        duration: match renderer["lengthText"].clone() {
-            Value::Null => None,
-            length_text => Some(remove_quotes(length_text["simpleText"].to_string())),
-        },
-        snippet: renderer["descriptionSnippet"]["runs"]
-            .as_array()
-            .unwrap_or(&Vec::new())
-            .iter()
-            .map(|e| e["text"].to_string())
-            .reduce(|a, b| format!("{a} {b}")),
-        upload_date: renderer["publishedTimeText"]["simpleText"]
-            .as_str()
-            .map(|e| e.to_string()),
-        thumbnail_src: renderer["thumbnail"]["thumbnails"]
-            .as_array()
-            .map(|e| e.last().map(|e2| remove_quotes(e2["url"].to_string())))
-            .unwrap_or(None),
-        views: match renderer["viewCountText"].clone() {
-            Value::Null => None,
-            view_count_text => Some(parse_views(remove_quotes(
-                view_count_text["simpleText"].to_string(),
-            ))),
-        },
-        uploader: Uploader {
-            id: remove_first_char(remove_quotes(renderer["ownerText"]["runs"][0]["navigationEndpoint"]["commandMetadata"]["webCommandMetadata"]["url"].to_string())),
+        channel: Channel {
+            id: channel_id.clone(),
             username: remove_quotes(renderer["ownerText"]["runs"][0]["text"].to_string()),
-            verified: renderer["ownerBadges"]
-                .as_array()
-                .unwrap_or(&Vec::new())
-                .iter()
-                .any(|badge| {
-                    badge["metadataBadgeRenderer"]["style"]
-                        .to_string()
-                        .contains("VERIFIED")
-                }),
+            url: format!("https://www.youtube.com/{}", channel_id),
+            tag: String::new()
         },
+        published_at: Utc::now(), // TODO: get the published_at on search video
         tag: String::new()
+    }
+}
+
+pub fn parse_playlist_props(renderer: Value) -> Playlist {
+    let id = renderer["rendererContext"]["commandContext"]["onTap"]["innertubeCommand"]["commandMetadata"]
+        ["webCommandMetadata"]["url"].to_string();
+
+    let channel_id = renderer["metadata"]["lockupMetadataViewModel"]["metadata"]["contentMetadataViewModel"]["metadataRows"][0]["metadataParts"][0]["text"]["commandRuns"][0]["onTap"]["innertubeCommand"]["browseEndpoint"]["canonicalBaseUrl"]
+                        .to_string();
+
+    let uploader = match channel_id.as_str() {
+        "null" => PlaylistUploader::MultiUploaders(
+            remove_quotes(
+                    renderer["metadata"]["lockupMetadataViewModel"]["metadata"]["contentMetadataViewModel"]["metadataRows"][0]["metadataParts"][0]["text"]["content"]
+                        .to_string(),
+            )
+        ),
+        channel_id => PlaylistUploader::Channel(
+            Channel {
+                id: remove_first_char(remove_quotes(channel_id.to_string())),
+                username: 
+                    remove_quotes(
+                        renderer["metadata"]["lockupMetadataViewModel"]["metadata"]["contentMetadataViewModel"]["metadataRows"][0]["metadataParts"][0]["text"]["content"]
+                            .to_string(),
+                    ),
+                url: format!("https://www.youtube.com/{}", channel_id),
+                tag: String::new()
+            },
+        )
+    };
+
+    Playlist {
+        id: remove_quotes(id.clone()),
+        title: remove_quotes(
+            renderer["metadata"]["lockupMetadataViewModel"]["title"]["content"].to_string(),
+        ),
+        uploader,
+        url: format!("https://www.youtube.com{}", remove_quotes(id)),
+        tag: String::new(),
     }
 }
 

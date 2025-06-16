@@ -4,7 +4,6 @@ use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
-
 type Terminal = ratatui::Terminal<CrosstermBackend<Stdout>>;
 
 use ratatui::{
@@ -17,7 +16,7 @@ use ratatui::{
 
 use crate::{
     terminal,
-    types::{ContentItem, VideoProps},
+    types::{ContentItem, Video},
     youtube::download::{DownloadType, download_from_yt},
 };
 
@@ -51,7 +50,7 @@ async fn download_on_menu(
 pub async fn videos_interface(
     terminal: &mut Terminal,
     videos: Vec<ContentItem>,
-) -> Result<Option<VideoProps>, Box<dyn Error>> {
+) -> Result<Option<Video>, Box<dyn Error>> {
     let menu_items = Arc::new(Mutex::new(videos));
     let mut selected = 0;
 
@@ -60,9 +59,7 @@ pub async fn videos_interface(
     loop {
         terminal.draw(|f| {
             let size = f.area();
-            let block = Block::default()
-                .title(" Youtube but good! (Videos) ")
-                .borders(Borders::ALL);
+            let block = Block::default().title(" Silk ").borders(Borders::ALL);
 
             let menu_items = menu_items.lock().unwrap();
 
@@ -98,6 +95,12 @@ pub async fn videos_interface(
                         if selected > 0 {
                             selected -= 1;
                         }
+                    }
+                    KeyCode::Char('s') => {
+                        menu_items.lock().unwrap()[selected].subscribe().await;
+                    }
+                    KeyCode::Char('u') => {
+                        menu_items.lock().unwrap()[selected].unsubscribe().await;
                     }
                     KeyCode::Down | KeyCode::Char('j') => {
                         if selected < menu_items.lock().unwrap().len() - 1 {

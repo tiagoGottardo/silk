@@ -10,10 +10,12 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem},
 };
 
-use super::search;
+use crate::youtube::{get_feed_videos, play_video};
+
+use super::{search, videos};
 
 pub async fn menu_interface(terminal: &mut Terminal) -> Result<(), Box<dyn Error>> {
-    let menu_items = vec!["Search", "Exit"];
+    let menu_items = vec!["Search", "Feed", "Exit"];
     let mut selected = 0;
 
     terminal.clear()?;
@@ -39,7 +41,7 @@ pub async fn menu_interface(terminal: &mut Terminal) -> Result<(), Box<dyn Error
 
             let list = List::new(items).block(
                 Block::default()
-                    .title(" Youtube but good! ")
+                    .title(" Silk (Home) ")
                     .borders(Borders::ALL),
             );
             f.render_widget(list, size);
@@ -61,6 +63,13 @@ pub async fn menu_interface(terminal: &mut Terminal) -> Result<(), Box<dyn Error
                     }
                     KeyCode::Enter | KeyCode::Char('l') if menu_items[selected] == "Search" => {
                         search::search_interface(terminal).await?
+                    }
+                    KeyCode::Enter | KeyCode::Char('l') if menu_items[selected] == "Feed" => {
+                        if let Some(video_selected) =
+                            videos::videos_interface(terminal, get_feed_videos().await?).await?
+                        {
+                            play_video(terminal, &video_selected.url).await?;
+                        }
                     }
                     KeyCode::Char('q') => break Ok(()),
                     _ => {}

@@ -1,11 +1,29 @@
+use core::fmt;
+use std::borrow::Cow;
+
+use chrono::{DateTime, Utc};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 
+pub struct ChannelDB {
+    pub channel_id: String,
+    pub channel_username: String,
+}
+
+pub struct VideoDB {
+    pub id: String,
+    pub title: String,
+    pub url: String,
+    pub published_at: String,
+    pub channel_id: String,
+    pub channel_username: String,
+}
+
 #[derive(Clone)]
 pub enum ContentItem {
-    Video(VideoProps),
-    Channel(ChannelProps),
-    Playlist,
+    Video(Video),
+    Channel(Channel),
+    Playlist(Playlist),
 }
 
 impl ContentItem {
@@ -13,26 +31,54 @@ impl ContentItem {
         match self {
             ContentItem::Video(video_props) => video_props.display(selected),
             ContentItem::Channel(channel_props) => channel_props.display(selected),
-            _ => vec![],
+            ContentItem::Playlist(playlist_props) => playlist_props.display(selected),
+        }
+    }
+
+    pub async fn unsubscribe(&mut self) {
+        match self {
+            ContentItem::Video(v) => v.unsubscribe().await,
+            _ => {}
+        }
+    }
+
+    pub async fn subscribe(&mut self) {
+        match self {
+            ContentItem::Video(v) => v.subscribe().await,
+            _ => {}
         }
     }
 }
 
 #[derive(Clone)]
-pub struct VideoProps {
+pub struct Video {
     pub id: String,
     pub title: String,
     pub url: String,
-    pub duration: Option<String>,
-    pub snippet: Option<String>,
-    pub upload_date: Option<String>,
-    pub thumbnail_src: Option<String>,
-    pub views: Option<i64>,
-    pub uploader: Uploader,
     pub tag: String,
+    pub channel: Channel,
+    pub published_at: DateTime<Utc>,
 }
 
-impl VideoProps {
+impl fmt::Display for Video {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Id: {}\n", self.id)?;
+        write!(f, "Title: {}\n", self.title)?;
+        write!(f, "Url: {}\n", self.url)?;
+        write!(f, "Channel:\n")?;
+        write!(f, "  Id: {}\n", self.channel.id)?;
+        write!(f, "  Username: {}\n", self.channel.username)?;
+        write!(f, "  Url: {}\n", self.channel.url)?;
+        write!(f, "Published at: {}\n", self.published_at)?;
+        if !self.tag.is_empty() {
+            write!(f, "Tag: {}\n", self.tag)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl Video {
     fn display(&self, selected: bool) -> Vec<Line> {
         if selected {
             return vec![
@@ -46,7 +92,7 @@ impl VideoProps {
                     Span::styled(format!(" {}\n", self.tag), Style::default().fg(Color::Blue)),
                 ]),
                 Line::from(vec![Span::styled(
-                    format!("  {}", self.uploader.username),
+                    format!("  {}", self.channel.username),
                     Style::default()
                         .fg(Color::Yellow)
                         .add_modifier(Modifier::BOLD),
@@ -59,35 +105,84 @@ impl VideoProps {
                 Span::raw(format!("  {}\n", self.title)),
                 Span::styled(format!(" {}\n", self.tag), Style::default().fg(Color::Blue)),
             ]),
-            Line::from(vec![Span::raw(format!("  {}", self.uploader.username))]),
+            Line::from(vec![Span::raw(format!("  {}", self.channel.username))]),
         ]
+    }
+
+    async fn subscribe(&mut self) {
+        let pool = crate::config::db::get();
+        let mut connection = pool.acquire().await.unwrap();
+
+        let result = sqlx::query!(
+            r#"
+                INSERT INTO subscriptions ( channel_id, channel_username ) VALUES ( ?1, ?2 ) "#,
+            self.channel.id,
+            self.channel.username
+        )
+        .execute(&mut *connection)
+        .await;
+
+        let tag = match result {
+            Ok(_) => String::from("Subscribed"),
+            Err(e)
+                if e.as_database_error().map(|e| e.code().unwrap_or_default())
+                    == Some(Cow::Borrowed("1555")) =>
+            {
+                String::from("You're already subscribed to this channel.")
+            }
+            Err(_) => String::from("Some error occur on subscribe"),
+        };
+
+        self.tag = tag;
+    }
+
+    async fn unsubscribe(&mut self) {
+        let pool = crate::config::db::get();
+        let mut connection = pool.acquire().await.unwrap();
+
+        let result = sqlx::query!(
+            r#"
+                DELETE FROM subscriptions WHERE channel_id = ?1;"#,
+            self.channel.id,
+        )
+        .execute(&mut *connection)
+        .await;
+
+        let tag = match result {
+            Ok(e) if e.rows_affected() == 0 => {
+                String::from("You're not subscribed to this channel")
+            }
+            Ok(_) => String::from("Unsubscribed"),
+            Err(_) => String::from("Some error occur on unsubscribe"),
+        };
+
+        self.tag = tag;
     }
 }
 
 #[derive(Clone)]
-pub struct Uploader {
+pub struct Channel {
     pub id: String,
     pub username: String,
-    pub verified: bool,
-}
-
-#[derive(Clone)]
-pub struct ChannelProps {
-    pub uploader: Uploader,
     pub url: String,
-    pub snippet: Option<String>,
-    pub thumbnail_src: Option<String>,
-    pub video_count: Option<String>,
-    pub subscriber_count: Option<String>,
     pub tag: String,
 }
 
-impl ChannelProps {
+impl Channel {
+    pub fn new(id: &str, username: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            username: username.to_string(),
+            url: format!("https://www.youtube.com/{}", id.to_string()),
+            tag: String::new(),
+        }
+    }
+
     fn display(&self, selected: bool) -> Vec<Line> {
         if selected {
             return vec![Line::from(vec![
                 Span::styled(
-                    format!("> {}\n", self.uploader.username),
+                    format!("> {}\n", self.username),
                     Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(format!(" {}\n", self.tag), Style::default().fg(Color::Blue)),
@@ -95,8 +190,60 @@ impl ChannelProps {
         }
 
         vec![Line::from(vec![
-            Span::raw(format!("  {}\n", self.uploader.username)),
+            Span::raw(format!("  {}\n", self.username)),
             Span::styled(format!(" {}\n", self.tag), Style::default().fg(Color::Blue)),
         ])]
+    }
+}
+
+#[derive(Clone)]
+pub struct Playlist {
+    pub id: String,
+    pub title: String,
+    pub url: String,
+    pub tag: String,
+    pub uploader: PlaylistUploader,
+}
+
+#[derive(Clone)]
+pub enum PlaylistUploader {
+    MultiUploaders(String),
+    Channel(Channel),
+}
+
+impl Playlist {
+    fn display(&self, selected: bool) -> Vec<Line> {
+        let uploader_username = match &self.uploader {
+            PlaylistUploader::MultiUploaders(username) => username.clone(),
+            PlaylistUploader::Channel(channel) => channel.username.clone(),
+        };
+
+        if selected {
+            return vec![
+                Line::from(vec![
+                    Span::styled(
+                        format!("> {}\n", self.title),
+                        Style::default()
+                            .fg(Color::Green)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(format!(" {}\n", self.tag), Style::default().fg(Color::Blue)),
+                ]),
+                Line::from(vec![Span::styled(
+                    format!("  {}", uploader_username),
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                )]),
+            ];
+        }
+
+        vec![
+            Line::from(vec![
+                Span::raw(format!("  {}\n", self.title)),
+                Span::styled(format!(" {}\n", self.tag), Style::default().fg(Color::Blue)),
+            ]),
+            Line::from(vec![Span::raw(format!("  {}", uploader_username))]),
+        ]
     }
 }

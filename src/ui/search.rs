@@ -4,7 +4,9 @@ type Terminal = ratatui::Terminal<CrosstermBackend<Stdout>>;
 
 use super::videos;
 use crate::youtube::play_video;
-use crate::youtube::search_fetch;
+use crate::youtube::search_content;
+use ratatui::crossterm::ExecutableCommand;
+use ratatui::crossterm::cursor;
 use ratatui::crossterm::event::KeyEventKind;
 use ratatui::{
     crossterm::event::{self, Event, KeyCode},
@@ -22,7 +24,7 @@ pub async fn search_interface(terminal: &mut Terminal) -> Result<(), Box<dyn Err
         terminal.draw(|f| {
             let size = f.area();
             let block = Block::default()
-                .title(" Youtube but good! ")
+                .title(" Silk (Search) ")
                 .borders(Borders::ALL);
 
             let paragraph =
@@ -32,6 +34,10 @@ pub async fn search_interface(terminal: &mut Terminal) -> Result<(), Box<dyn Err
 
             f.render_widget(paragraph, size);
         })?;
+        terminal.backend_mut().execute(cursor::Show)?;
+        terminal
+            .backend_mut()
+            .execute(cursor::MoveTo(input.len() as u16 + 10, 1))?;
 
         if let Event::Key(key) = event::read()? {
             if key.kind != KeyEventKind::Press {
@@ -41,7 +47,9 @@ pub async fn search_interface(terminal: &mut Terminal) -> Result<(), Box<dyn Err
             match key.code {
                 KeyCode::Esc => return Ok(()),
                 KeyCode::Enter => break,
-                KeyCode::Char(c) => input.push(c),
+                KeyCode::Char(c) => {
+                    input.push(c);
+                }
                 KeyCode::Backspace => {
                     input.pop();
                 }
@@ -49,14 +57,12 @@ pub async fn search_interface(terminal: &mut Terminal) -> Result<(), Box<dyn Err
             }
         }
     }
+    terminal.hide_cursor()?;
 
-    if let Some(video_selected) = videos::videos_interface(
-        terminal,
-        search_fetch::fetch_video_titles(input.as_str()).await?,
-    )
-    .await?
+    if let Some(video_selected) =
+        videos::videos_interface(terminal, search_content(input.as_str()).await?).await?
     {
-        play_video::play_video(terminal, &video_selected.url).await?;
+        play_video(terminal, &video_selected.url).await?;
     }
 
     Ok(())
