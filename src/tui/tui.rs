@@ -30,8 +30,6 @@ pub enum Msg {
     AppClose,
     Clock,
     MenuSelected(MenuItem),
-    MenuMoveUp,
-    MenuMoveDown,
     AppExit,
     None,
 }

@@ -2,19 +2,16 @@
 //!
 //! app model
 
-use std::time::{Duration};
+use std::time::Duration;
 
 use tuirealm::event::NoUserEvent;
 use tuirealm::props::{Alignment, Color, TextModifiers};
 use tuirealm::ratatui::layout::{Constraint, Direction, Layout};
 use tuirealm::terminal::{CrosstermTerminalAdapter, TerminalAdapter, TerminalBridge};
-use tuirealm::{
-    Application, EventListenerCfg, Update,
-};
+use tuirealm::{Application, EventListenerCfg, Update};
 
-use super::super::components::Label;
-use super::super::tui::{Id, Msg};
-
+use super::super::components::{Label, Menu};
+use super::super::tui::{Id, MenuItem, Msg};
 pub struct Model<T>
 where
     T: TerminalAdapter,
@@ -47,14 +44,10 @@ where
                     let chunks = Layout::default()
                         .direction(Direction::Vertical)
                         .margin(1)
-                        .constraints(
-                            [
-                                Constraint::Length(1), // Label
-                            ]
-                            .as_ref(),
-                        )
+                        .constraints([Constraint::Length(1), Constraint::Min(0)].as_ref())
                         .split(f.area());
                     self.app.view(&Id::Label, f, chunks[0]);
+                    self.app.view(&Id::MenuList, f, chunks[1]);
                 })
                 .is_ok()
         );
@@ -67,7 +60,7 @@ where
                 .poll_timeout(Duration::from_millis(10))
                 .tick_interval(Duration::from_secs(1)),
         );
-        
+
         assert!(
             app.mount(
                 Id::Label,
@@ -84,7 +77,12 @@ where
             .is_ok()
         );
 
-        assert!(app.active(&Id::Label).is_ok());
+        assert!(
+            app.mount(Id::MenuList, Box::new(Menu::default()), Vec::default())
+                .is_ok()
+        );
+
+        assert!(app.active(&Id::MenuList).is_ok());
 
         app
     }
@@ -104,6 +102,13 @@ where
                     None
                 }
                 Msg::Clock => None,
+                Msg::MenuSelected(item) => {
+                    match item {
+                        MenuItem::Exit => self.quit = true, // Terminate
+                        _ => {}
+                    }
+                    None
+                }
                 _ => None,
             }
         } else {
