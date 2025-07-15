@@ -3,9 +3,8 @@ use std::error::Error;
 use clap::{Parser, Subcommand};
 use silk::{
     config::{db, env},
-    terminal,
+    terminal, tui,
     youtube::{self, update_feed},
-    tui,
 };
 
 #[derive(Parser)]
