@@ -1,6 +1,5 @@
 //! ## Input
-//!
-//! input component
+// a tui-realm component to render an input
 
 use ratatui::layout::Position;
 use tuirealm::command::{Cmd, CmdResult, Direction};
@@ -12,6 +11,7 @@ use tuirealm::{
     AttrValue, Attribute, Component, Event, Frame, MockComponent, NoUserEvent, Props, State,
     StateValue,
 };
+use unicode_segmentation::UnicodeSegmentation;
 
 use super::super::tui::Msg;
 use super::get_block;
@@ -58,6 +58,17 @@ impl Input {
         self.attr(Attribute::Borders, AttrValue::Borders(b));
         self
     }
+
+    fn get_formatted_input(&self) -> (String, u16) {
+        let input = self.states.input.as_str();
+        let cursor_col = self.get_cursor_column();
+        (input.to_string(), cursor_col)
+    }
+
+    fn get_cursor_column(&self) -> u16 {
+        let head = &self.states.input[..self.states.cursor_position];
+        head.graphemes(true).count() as u16
+    }
 }
 
 impl MockComponent for Input {
@@ -93,29 +104,22 @@ impl MockComponent for Input {
                 .props
                 .get_or(Attribute::Focus, AttrValue::Flag(false))
                 .unwrap_flag();
+            let mut style = Style::default().fg(foreground).bg(background);
 
-            let mut text_to_display = self.states.input.clone();
             if focus {
-                text_to_display.push(' ');
+                style = style.add_modifier(modifiers);
             }
 
+            let (text_to_display, cursor_col) = self.get_formatted_input();
             frame.render_widget(
                 Paragraph::new(text_to_display)
-                    .style(
-                        Style::default()
-                            .fg(foreground)
-                            .bg(background)
-                            .add_modifier(modifiers),
-                    )
-                    .block(get_block(borders, title, focus)),
+                    .block(get_block(borders, title, focus))
+                    .style(style),
                 area,
             );
 
             if focus {
-                frame.set_cursor_position(Position::new(
-                    area.x + self.states.cursor as u16 + 1u16,
-                    area.y + 1,
-                ));
+                frame.set_cursor_position(Position::new(area.x + cursor_col + 1, area.y + 1));
             }
         }
     }
@@ -143,7 +147,7 @@ impl MockComponent for Input {
                 CmdResult::Changed(self.state())
             }
             Cmd::Delete => {
-                self.states.del();
+                self.states.backspace();
                 CmdResult::Changed(self.state())
             }
             Cmd::Cancel => {
@@ -161,46 +165,57 @@ impl MockComponent for Input {
 }
 
 #[derive(Default)]
-struct OwnStates {
+pub struct OwnStates {
     input: String,
-    cursor: usize,
+    cursor_position: usize,
 }
 
 impl OwnStates {
     fn append(&mut self, ch: char) {
-        self.input.insert(self.cursor, ch);
+        self.input.insert(self.cursor_position, ch);
         self.incr_cursor();
     }
 
-    fn del(&mut self) {
-        if self.cursor > 0 {
+    fn backspace(&mut self) {
+        if self.cursor_position > 0 {
             self.decr_cursor();
-            self.input.remove(self.cursor);
+            self.input.remove(self.cursor_position);
         }
     }
-
     fn clear(&mut self) {
         self.input.clear();
         self.cursor_at_begin();
     }
 
     fn incr_cursor(&mut self) {
-        self.cursor = self.cursor.saturating_add(1);
-        if self.cursor > self.input.len() {
+        if let Some((idx, _)) = self
+            .input
+            .grapheme_indices(true)
+            .find(|(idx, _)| *idx > self.cursor_position)
+        {
+            self.cursor_position = idx;
+        } else {
             self.cursor_at_end();
         }
     }
 
     fn decr_cursor(&mut self) {
-        self.cursor = self.cursor.saturating_sub(1);
-    }
-
-    fn cursor_at_begin(&mut self) {
-        self.cursor = 0;
+        if let Some((idx, _)) = self
+            .input
+            .grapheme_indices(true)
+            .take_while(|(idx, _)| *idx < self.cursor_position)
+            .last()
+        {
+            self.cursor_position = idx;
+        }
     }
 
     fn cursor_at_end(&mut self) {
-        self.cursor = self.input.len();
+        self.cursor_position = self.input.len();
+    }
+
+    fn cursor_at_begin(&mut self) {
+        self.cursor_position = 0;
     }
 }
 

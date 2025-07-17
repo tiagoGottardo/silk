@@ -2415,6 +2415,7 @@ dependencies = [
  "tokio",
  "tui-realm-stdlib",
  "tuirealm",
+ "unicode-segmentation",
  "urlencoding",
 ]
 
