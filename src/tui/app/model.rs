@@ -5,13 +5,14 @@
 use std::time::Duration;
 
 use tuirealm::event::NoUserEvent;
-use tuirealm::props::{Alignment, Color, TextModifiers};
+use tuirealm::props::{Borders, Color};
 use tuirealm::ratatui::layout::{Constraint, Direction, Layout};
 use tuirealm::terminal::{CrosstermTerminalAdapter, TerminalAdapter, TerminalBridge};
 use tuirealm::{Application, EventListenerCfg, Update};
 
-use super::super::components::{Label, Menu};
+use super::super::components::{Input, Menu};
 use super::super::tui::{Id, MenuItem, Msg};
+
 pub struct Model<T>
 where
     T: TerminalAdapter,
@@ -44,10 +45,11 @@ where
                     let chunks = Layout::default()
                         .direction(Direction::Vertical)
                         .margin(1)
-                        .constraints([Constraint::Length(1), Constraint::Min(0)].as_ref())
+                        .constraints([Constraint::Length(3), Constraint::Min(1)])
                         .split(f.area());
-                    self.app.view(&Id::Label, f, chunks[0]);
-                    self.app.view(&Id::MenuList, f, chunks[1]);
+
+                    self.app.view(&Id::Input, f, chunks[0]);
+                    self.app.view(&Id::MainMenu, f, chunks[1]);
                 })
                 .is_ok()
         );
@@ -63,14 +65,12 @@ where
 
         assert!(
             app.mount(
-                Id::Label,
+                Id::Input,
                 Box::new(
-                    Label::default()
-                        .text("Press esc to exit")
-                        .alignment(Alignment::Left)
-                        .background(Color::Reset)
-                        .foreground(Color::LightYellow)
-                        .modifiers(TextModifiers::BOLD),
+                    Input::default()
+                        .borders(Borders::default())
+                        .foreground(Color::Green)
+                        .label("Search on Youtube"),
                 ),
                 Vec::default(),
             )
@@ -78,11 +78,19 @@ where
         );
 
         assert!(
-            app.mount(Id::MenuList, Box::new(Menu::default()), Vec::default())
-                .is_ok()
+            app.mount(
+                Id::MainMenu,
+                Box::new(Menu::new(vec![
+                    MenuItem::Search,
+                    MenuItem::Feed,
+                    MenuItem::Exit
+                ])),
+                Vec::default()
+            )
+            .is_ok()
         );
 
-        assert!(app.active(&Id::MenuList).is_ok());
+        assert!(app.active(&Id::MainMenu).is_ok());
 
         app
     }
@@ -105,8 +113,19 @@ where
                 Msg::MenuSelected(item) => {
                     match item {
                         MenuItem::Exit => self.quit = true, // Terminate
+                        MenuItem::Search => {
+                            assert!(self.app.active(&Id::Input).is_ok());
+                        }
                         _ => {}
                     }
+                    None
+                }
+                Msg::Search(input) => {
+                    self.quit = true;
+                    None
+                }
+                Msg::Exit => {
+                    assert!(self.app.active(&Id::MainMenu).is_ok());
                     None
                 }
                 _ => None,

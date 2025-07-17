@@ -28,16 +28,19 @@ impl fmt::Display for MenuItem {
 #[derive(Debug, PartialEq)]
 pub enum Msg {
     AppClose,
+    Exit,
     Clock,
     MenuSelected(MenuItem),
-    AppExit,
+    Search(String),
     None,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub enum Id {
     Clock,
-    MenuList,
+    MainMenu,
+    SearchMenu,
+    Input,
     Label,
 }
 

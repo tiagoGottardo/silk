@@ -16,9 +16,8 @@ pub struct Menu {
     items: Vec<MenuItem>,
 }
 
-impl Default for Menu {
-    fn default() -> Self {
-        let items = vec![MenuItem::Search, MenuItem::Feed, MenuItem::Exit];
+impl Menu {
+    pub fn new(items: Vec<MenuItem>) -> Self {
         let mut table = TableBuilder::default();
         for item in items.iter() {
             table.add_col(TextSpan::from(item.to_string())).add_row();
@@ -32,7 +31,7 @@ impl Default for Menu {
                 .highlighted_str(">> ")
                 .modifiers(TextModifiers::BOLD)
                 .scroll(true)
-                .step(4)
+                .step(3)
                 .borders(Borders::default())
                 .title("Menu", Alignment::Center)
                 .rewind(true)
