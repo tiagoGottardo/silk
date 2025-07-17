@@ -19,8 +19,11 @@ pub struct Menu {
 impl Menu {
     pub fn new(items: Vec<MenuItem>) -> Self {
         let mut table = TableBuilder::default();
-        for item in items.iter() {
-            table.add_col(TextSpan::from(item.to_string())).add_row();
+        if let Some((last, head)) = items.split_last() {
+            for item in head {
+                table.add_col(TextSpan::from(item.to_string())).add_row();
+            }
+            table.add_col(TextSpan::from(last.to_string()));
         }
 
         Self {
