@@ -8,22 +8,21 @@ use tuirealm::{
     AttrValue, Attribute, Component, Event, Frame, MockComponent, NoUserEvent, State, StateValue,
 };
 
-use super::super::tui::MenuItem;
 use super::super::tui::Msg;
 
 pub struct Menu {
     component: List,
-    items: Vec<MenuItem>,
+    items: Vec<String>,
 }
 
 impl Menu {
-    pub fn new(items: Vec<MenuItem>) -> Self {
+    pub fn new(items: Vec<String>) -> Self {
         let mut table = TableBuilder::default();
         if let Some((last, head)) = items.split_last() {
             for item in head {
-                table.add_col(TextSpan::from(item.to_string())).add_row();
+                table.add_col(TextSpan::from(item.clone())).add_row();
             }
-            table.add_col(TextSpan::from(last.to_string()));
+            table.add_col(TextSpan::from(last.clone()));
         }
 
         Self {

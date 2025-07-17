@@ -1,37 +1,18 @@
 //! ## Tui
-use std::fmt;
 
+use crate::tui::app::model::Model;
+use crate::types::ContentItem;
 use tuirealm::application::PollStrategy;
 use tuirealm::{AttrValue, Attribute, Update};
 
-use crate::tui::app;
-use app::model::Model;
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum MenuItem {
-    Search,
-    Feed,
-    Exit,
-}
-
-impl fmt::Display for MenuItem {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let label = match self {
-            MenuItem::Search => "Search",
-            MenuItem::Feed => "Feed",
-            MenuItem::Exit => "Exit",
-        };
-        write!(f, "{}", label)
-    }
-}
-
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq)]
 pub enum Msg {
     AppClose,
     Exit,
     Clock,
-    MenuSelected(MenuItem),
+    MenuSelected(String),
     Search(String),
+    SearchResults(Vec<ContentItem>),
     None,
 }
 
@@ -42,16 +23,24 @@ pub enum Id {
     SearchMenu,
     Input,
     Label,
+    SearchResults,
 }
 
 pub fn main() {
     let mut model = Model::default();
+    let (tx, mut rx) = tokio::sync::mpsc::channel(1024);
+    model.tx = tx;
 
     let _ = model.terminal.enter_alternate_screen();
     let _ = model.terminal.enable_raw_mode();
 
     while !model.quit {
         // Tick
+        let mut messages = vec![];
+        while let Ok(msg) = rx.try_recv() {
+            messages.push(msg);
+        }
+
         match model.app.tick(PollStrategy::Once) {
             Err(err) => {
                 assert!(
@@ -65,17 +54,21 @@ pub fn main() {
                         .is_ok()
                 );
             }
-            Ok(messages) if !messages.is_empty() => {
-                model.redraw = true;
-                for msg in messages {
-                    let mut msg = Some(msg);
-                    while msg.is_some() {
-                        msg = model.update(msg);
-                    }
+            Ok(app_messages) => {
+                messages.extend(app_messages);
+            }
+        }
+
+        if !messages.is_empty() {
+            model.redraw = true;
+            for msg in messages {
+                let mut msg = Some(msg);
+                while msg.is_some() {
+                    msg = model.update(msg);
                 }
             }
-            _ => {}
         }
+
         // Redraw
         if model.redraw {
             model.view();

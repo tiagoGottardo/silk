@@ -4,14 +4,18 @@
 
 use std::time::Duration;
 
+use tokio::sync::mpsc;
 use tuirealm::event::NoUserEvent;
 use tuirealm::props::{Borders, Color};
 use tuirealm::ratatui::layout::{Constraint, Direction, Layout};
 use tuirealm::terminal::{CrosstermTerminalAdapter, TerminalAdapter, TerminalBridge};
 use tuirealm::{Application, EventListenerCfg, Update};
 
+use crate::types::ContentItem;
+use crate::youtube::search_content;
+
 use super::super::components::{Input, Menu};
-use super::super::tui::{Id, MenuItem, Msg};
+use super::super::tui::{Id, Msg};
 
 pub struct Model<T>
 where
@@ -21,15 +25,18 @@ where
     pub quit: bool,
     pub redraw: bool,
     pub terminal: TerminalBridge<T>,
+    pub tx: mpsc::Sender<Msg>,
 }
 
 impl Default for Model<CrosstermTerminalAdapter> {
     fn default() -> Self {
+        let (tx, _rx) = mpsc::channel(1024);
         Self {
             app: Self::init_app(),
             quit: false,
             redraw: true,
             terminal: TerminalBridge::init_crossterm().expect("Cannot initialize terminal"),
+            tx,
         }
     }
 }
@@ -70,9 +77,9 @@ where
                     Input::default()
                         .borders(Borders::default())
                         .foreground(Color::Green)
-                        .label("Search on Youtube"),
+                        .label("Search on Youtube")
                 ),
-                Vec::default(),
+                Vec::default()
             )
             .is_ok()
         );
@@ -81,9 +88,9 @@ where
             app.mount(
                 Id::MainMenu,
                 Box::new(Menu::new(vec![
-                    MenuItem::Search,
-                    MenuItem::Feed,
-                    MenuItem::Exit
+                    "Search".to_string(),
+                    "Feed".to_string(),
+                    "Exit".to_string()
                 ])),
                 Vec::default()
             )
@@ -111,17 +118,47 @@ where
                 }
                 Msg::Clock => None,
                 Msg::MenuSelected(item) => {
-                    match item {
-                        MenuItem::Exit => self.quit = true, // Terminate
-                        MenuItem::Search => {
+                    match item.as_str() {
+                        "Exit" => {
+                            self.quit = true;
+                        }
+                        "Search" => {
                             assert!(self.app.active(&Id::Input).is_ok());
                         }
+                        "Feed" => {}
                         _ => {}
                     }
                     None
                 }
                 Msg::Search(input) => {
-                    self.quit = true;
+                    let tx = self.tx.clone();
+                    tokio::spawn(async move {
+                        if let Ok(content) = search_content(&input).await {
+                            tx.send(Msg::SearchResults(content)).await.ok();
+                        }
+                    });
+                    None
+                }
+                Msg::SearchResults(content) => {
+                    let menu_items = content
+                        .iter()
+                        .map(|content_item| match content_item {
+                            ContentItem::Video(video) => video.title.clone(),
+                            ContentItem::Channel(channel) => channel.username.clone(),
+                            ContentItem::Playlist(playlist) => playlist.title.clone(),
+                        })
+                        .collect();
+
+                    assert!(
+                        self.app
+                            .remount(
+                                Id::MainMenu,
+                                Box::new(Menu::new(menu_items)),
+                                Vec::default()
+                            )
+                            .is_ok()
+                    );
+
                     None
                 }
                 Msg::Exit => {

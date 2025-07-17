@@ -19,7 +19,7 @@ pub struct VideoDB {
     pub channel_username: String,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum ContentItem {
     Video(Video),
     Channel(Channel),
@@ -50,7 +50,7 @@ impl ContentItem {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Video {
     pub id: String,
     pub title: String,
@@ -160,7 +160,7 @@ impl Video {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Channel {
     pub id: String,
     pub username: String,
@@ -196,7 +196,7 @@ impl Channel {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Playlist {
     pub id: String,
     pub title: String,
@@ -205,7 +205,7 @@ pub struct Playlist {
     pub uploader: PlaylistUploader,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum PlaylistUploader {
     MultiUploaders(String),
     Channel(Channel),
