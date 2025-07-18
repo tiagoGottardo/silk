@@ -10,7 +10,7 @@ pub enum Msg {
     AppClose,
     Exit,
     Clock,
-    MenuSelected(String),
+    MenuSelected(String, usize),
     Search(String),
     SearchResults(Vec<ContentItem>),
     None,

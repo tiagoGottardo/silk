@@ -11,6 +11,7 @@ use tuirealm::ratatui::layout::{Constraint, Direction, Layout};
 use tuirealm::terminal::{CrosstermTerminalAdapter, TerminalAdapter, TerminalBridge};
 use tuirealm::{Application, EventListenerCfg, Update};
 
+use crate::config::play_video_command;
 use crate::types::ContentItem;
 use crate::youtube::search_content;
 
@@ -25,6 +26,8 @@ where
     pub quit: bool,
     pub redraw: bool,
     pub terminal: TerminalBridge<T>,
+    pub search_result: Vec<ContentItem>,
+    pub show_result: bool,
     pub tx: mpsc::Sender<Msg>,
 }
 
@@ -36,6 +39,8 @@ impl Default for Model<CrosstermTerminalAdapter> {
             quit: false,
             redraw: true,
             terminal: TerminalBridge::init_crossterm().expect("Cannot initialize terminal"),
+            search_result: Vec::default(),
+            show_result: false,
             tx,
         }
     }
@@ -117,17 +122,33 @@ where
                     None
                 }
                 Msg::Clock => None,
-                Msg::MenuSelected(item) => {
-                    match item.as_str() {
-                        "Exit" => {
-                            self.quit = true;
+                Msg::MenuSelected(item, idx) => {
+                    match self.show_result {
+                        true => {
+                            let content_item = &self.search_result[idx];
+
+                            let url = match content_item {
+                                ContentItem::Video(video) => Some(video.url.to_string()),
+                                ContentItem::Channel(_) => None,
+                                ContentItem::Playlist(_) => None,
+                            };
+
+                            if let Some(url) = url {
+                                let _ = play_video_command(url);
+                            }
                         }
-                        "Search" => {
-                            assert!(self.app.active(&Id::Input).is_ok());
-                        }
-                        "Feed" => {}
-                        _ => {}
+                        false => match item.as_str() {
+                            "Exit" => {
+                                self.quit = true;
+                            }
+                            "Search" => {
+                                assert!(self.app.active(&Id::Input).is_ok());
+                            }
+                            "Feed" => {}
+                            _ => {}
+                        },
                     }
+
                     None
                 }
                 Msg::Search(input) => {
@@ -140,6 +161,8 @@ where
                     None
                 }
                 Msg::SearchResults(content) => {
+                    self.search_result = content.clone();
+
                     let menu_items = content
                         .iter()
                         .map(|content_item| match content_item {
@@ -148,6 +171,8 @@ where
                             ContentItem::Playlist(playlist) => playlist.title.clone(),
                         })
                         .collect();
+
+                    self.show_result = true;
 
                     assert!(
                         self.app

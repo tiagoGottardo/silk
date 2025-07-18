@@ -83,7 +83,7 @@ impl Component<Msg, NoUserEvent> for Menu {
             }) => {
                 if let State::One(StateValue::Usize(index)) = self.state() {
                     if let Some(item) = self.items.get(index) {
-                        Some(Msg::MenuSelected(item.clone()))
+                        Some(Msg::MenuSelected(item.clone(), index))
                     } else {
                         Some(Msg::None)
                     }
