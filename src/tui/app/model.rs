@@ -11,7 +11,6 @@ use tuirealm::ratatui::layout::{Constraint, Direction, Layout};
 use tuirealm::terminal::{CrosstermTerminalAdapter, TerminalAdapter, TerminalBridge};
 use tuirealm::{Application, EventListenerCfg, Update};
 
-use crate::config::play_video_command;
 use crate::types::ContentItem;
 use crate::youtube::search_content;
 
@@ -125,19 +124,11 @@ where
                 Msg::MenuSelected(item, idx) => {
                     match self.show_result {
                         true => {
-                            let content_item = &self.search_result[idx];
+                            let mut content_item = self.search_result[idx].clone();
 
-                            let url = match content_item {
-                                ContentItem::Video(video) => Some(video.url.to_string()),
-                                ContentItem::Channel(_) => None,
-                                ContentItem::Playlist(_) => None,
-                            };
-
-                            if let Some(url) = url {
-                                tokio::spawn(async move {
-                                    let _ = play_video_command(url).await;
-                                });
-                            }
+                            tokio::spawn(async move {
+                                content_item.play().await;
+                            });
                         }
                         false => match item.as_str() {
                             "Exit" => {

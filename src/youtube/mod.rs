@@ -37,7 +37,7 @@ pub async fn play_video(terminal: &mut Terminal, url: &str) -> Result<(), Box<dy
 
     let stream_url = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
-    play_video_command(stream_url).await;
+    let _ = play_video_command(stream_url).await;
 
     sleep(Duration::from_secs(3));
     terminal.autoresize()?;

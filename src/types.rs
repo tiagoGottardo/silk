@@ -5,6 +5,7 @@ use chrono::{DateTime, Utc};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 
+use crate::config::play_video_command;
 use crate::youtube::download::{DownloadType, download_from_yt};
 
 pub struct ChannelDB {
@@ -61,6 +62,13 @@ impl ContentItem {
             ContentItem::Video(v) => v.download(download_type).await,
             _ => {}
         }
+    }
+
+    pub async fn play(&mut self) {
+        match self {
+            ContentItem::Video(v) => v.play().await,
+            _ => {}
+        };
     }
 }
 
@@ -182,6 +190,10 @@ impl Video {
                 Err(_) => String::from("Some error occur on dowload!"),
             };
         });
+    }
+
+    async fn play(&mut self) {
+        let _ = play_video_command(self.url.clone()).await;
     }
 }
 
