@@ -153,6 +153,18 @@ where
 
                     None
                 }
+                Msg::Subscribe(_, idx) => {
+                    let content_item = &mut self.search_result[idx];
+                    let _ = content_item.subscribe();
+
+                    None
+                }
+                Msg::Unsubscribe(_, idx) => {
+                    let content_item = &mut self.search_result[idx];
+                    let _ = content_item.unsubscribe();
+
+                    None
+                }
                 Msg::Search(input) => {
                     let tx = self.tx.clone();
                     tokio::spawn(async move {

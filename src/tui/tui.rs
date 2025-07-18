@@ -11,6 +11,8 @@ pub enum Msg {
     Exit,
     Clock,
     MenuSelected(String, usize),
+    Subscribe(String, usize),
+    Unsubscribe(String, usize),
     Search(String),
     SearchResults(Vec<ContentItem>),
     None,

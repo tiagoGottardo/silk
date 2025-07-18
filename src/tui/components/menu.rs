@@ -67,26 +67,52 @@ impl MockComponent for Menu {
 
 impl Component<Msg, NoUserEvent> for Menu {
     fn on(&mut self, ev: Event<NoUserEvent>) -> Option<Msg> {
+        let current_selection = if let State::One(StateValue::Usize(index)) = self.state() {
+            self.items.get(index).map(|item| (item.clone(), index))
+        } else {
+            None
+        };
+
         match ev {
             Event::Keyboard(KeyEvent {
-                code: Key::Down | Key::Char('j'), ..
+                code: Key::Down | Key::Char('j'),
+                ..
             }) => {
                 self.perform(Cmd::Move(Direction::Down));
                 Some(Msg::None)
             }
-            Event::Keyboard(KeyEvent { code: Key::Up | Key::Char('k'), .. }) => {
+            Event::Keyboard(KeyEvent {
+                code: Key::Up | Key::Char('k'),
+                ..
+            }) => {
                 self.perform(Cmd::Move(Direction::Up));
                 Some(Msg::None)
             }
             Event::Keyboard(KeyEvent {
                 code: Key::Enter, ..
             }) => {
-                if let State::One(StateValue::Usize(index)) = self.state() {
-                    if let Some(item) = self.items.get(index) {
-                        Some(Msg::MenuSelected(item.clone(), index))
-                    } else {
-                        Some(Msg::None)
-                    }
+                if let Some((item, index)) = current_selection {
+                    Some(Msg::MenuSelected(item, index))
+                } else {
+                    Some(Msg::None)
+                }
+            }
+            Event::Keyboard(KeyEvent {
+                code: Key::Char('s'),
+                ..
+            }) => {
+                if let Some((item, index)) = current_selection {
+                    Some(Msg::Subscribe(item, index))
+                } else {
+                    Some(Msg::None)
+                }
+            }
+            Event::Keyboard(KeyEvent {
+                code: Key::Char('u'),
+                ..
+            }) => {
+                if let Some((item, index)) = current_selection {
+                    Some(Msg::Unsubscribe(item, index))
                 } else {
                     Some(Msg::None)
                 }
