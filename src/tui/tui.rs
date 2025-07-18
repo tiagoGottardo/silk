@@ -13,6 +13,7 @@ pub enum Msg {
     MenuSelected(String, usize),
     Subscribe(String, usize),
     Unsubscribe(String, usize),
+    Download(String, usize, bool),
     Search(String),
     SearchResults(Vec<ContentItem>),
     None,

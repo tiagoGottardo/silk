@@ -5,6 +5,8 @@ use chrono::{DateTime, Utc};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 
+use crate::youtube::download::{DownloadType, download_from_yt};
+
 pub struct ChannelDB {
     pub channel_id: String,
     pub channel_username: String,
@@ -45,6 +47,18 @@ impl ContentItem {
     pub async fn subscribe(&mut self) {
         match self {
             ContentItem::Video(v) => v.subscribe().await,
+            _ => {}
+        }
+    }
+
+    pub async fn download(&mut self, video_track: bool) {
+        let download_type = match video_track {
+            true => DownloadType::Video,
+            false => DownloadType::Audio,
+        };
+
+        match self {
+            ContentItem::Video(v) => v.download(download_type).await,
             _ => {}
         }
     }
@@ -157,6 +171,17 @@ impl Video {
         };
 
         self.tag = tag;
+    }
+
+    async fn download(&mut self, download_type: DownloadType) {
+        let url = self.url.clone();
+
+        tokio::task::spawn(async move {
+            let _ = match download_from_yt(&url, download_type).await {
+                Ok(_) => String::from("Downloaded!"),
+                Err(_) => String::from("Some error occur on dowload!"),
+            };
+        });
     }
 }
 

@@ -165,6 +165,15 @@ where
 
                     None
                 }
+                Msg::Download(_, idx, veido_track) => {
+                    let mut content_item = self.search_result[idx].clone();
+
+                    tokio::spawn(async move {
+                        content_item.download(veido_track).await;
+                    });
+
+                    None
+                }
                 Msg::Search(input) => {
                     let tx = self.tx.clone();
                     tokio::spawn(async move {

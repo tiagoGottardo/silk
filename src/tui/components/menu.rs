@@ -117,6 +117,26 @@ impl Component<Msg, NoUserEvent> for Menu {
                     Some(Msg::None)
                 }
             }
+            Event::Keyboard(KeyEvent {
+                code: Key::Char('d'),
+                ..
+            }) => {
+                if let Some((item, index)) = current_selection {
+                    Some(Msg::Download(item, index, true))
+                } else {
+                    Some(Msg::None)
+                }
+            }
+            Event::Keyboard(KeyEvent {
+                code: Key::Char('m'),
+                ..
+            }) => {
+                if let Some((item, index)) = current_selection {
+                    Some(Msg::Download(item, index, false))
+                } else {
+                    Some(Msg::None)
+                }
+            }
             Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => Some(Msg::AppClose),
             _ => Some(Msg::None),
         }
