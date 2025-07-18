@@ -17,6 +17,12 @@ use crate::youtube::search_content;
 use super::super::components::{Input, Menu};
 use super::super::tui::{Id, Msg};
 
+pub enum MenuContent {
+    SearchResult,
+    MainMenu,
+    Idle,
+}
+
 pub struct Model<T>
 where
     T: TerminalAdapter,
@@ -26,7 +32,7 @@ where
     pub redraw: bool,
     pub terminal: TerminalBridge<T>,
     pub search_result: Vec<ContentItem>,
-    pub show_result: bool,
+    pub menu_content: MenuContent,
     pub tx: mpsc::Sender<Msg>,
 }
 
@@ -39,7 +45,7 @@ impl Default for Model<CrosstermTerminalAdapter> {
             redraw: true,
             terminal: TerminalBridge::init_crossterm().expect("Cannot initialize terminal"),
             search_result: Vec::default(),
-            show_result: false,
+            menu_content: MenuContent::MainMenu,
             tx,
         }
     }
@@ -60,7 +66,7 @@ where
                         .split(f.area());
 
                     self.app.view(&Id::Input, f, chunks[0]);
-                    self.app.view(&Id::MainMenu, f, chunks[1]);
+                    self.app.view(&Id::Menu, f, chunks[1]);
                 })
                 .is_ok()
         );
@@ -90,7 +96,7 @@ where
 
         assert!(
             app.mount(
-                Id::MainMenu,
+                Id::Menu,
                 Box::new(Menu::new(vec![
                     "Search".to_string(),
                     "Feed".to_string(),
@@ -101,7 +107,7 @@ where
             .is_ok()
         );
 
-        assert!(app.active(&Id::MainMenu).is_ok());
+        assert!(app.active(&Id::Menu).is_ok());
 
         app
     }
@@ -122,24 +128,26 @@ where
                 }
                 Msg::Clock => None,
                 Msg::MenuSelected(item, idx) => {
-                    match self.show_result {
-                        true => {
+                    match self.menu_content {
+                        MenuContent::SearchResult => {
                             let mut content_item = self.search_result[idx].clone();
 
                             tokio::spawn(async move {
                                 content_item.play().await;
                             });
                         }
-                        false => match item.as_str() {
+                        MenuContent::MainMenu => match item.as_str() {
                             "Exit" => {
                                 self.quit = true;
                             }
                             "Search" => {
                                 assert!(self.app.active(&Id::Input).is_ok());
+                                self.menu_content = MenuContent::Idle;
                             }
                             "Feed" => {}
                             _ => {}
                         },
+                        _ => {} // Should not happen
                     }
 
                     None
@@ -172,6 +180,8 @@ where
                             tx.send(Msg::SearchResults(content)).await.ok();
                         }
                     });
+
+                    assert!(self.app.active(&Id::Menu).is_ok());
                     None
                 }
                 Msg::SearchResults(content) => {
@@ -186,22 +196,42 @@ where
                         })
                         .collect();
 
-                    self.show_result = true;
+                    self.menu_content = MenuContent::SearchResult;
 
                     assert!(
                         self.app
-                            .remount(
-                                Id::MainMenu,
-                                Box::new(Menu::new(menu_items)),
-                                Vec::default()
-                            )
+                            .remount(Id::Menu, Box::new(Menu::new(menu_items)), Vec::default())
                             .is_ok()
                     );
 
                     None
                 }
                 Msg::Exit => {
-                    assert!(self.app.active(&Id::MainMenu).is_ok());
+                    match self.menu_content {
+                        MenuContent::SearchResult => {
+                            assert!(
+                                self.app
+                                    .remount(
+                                        Id::Menu,
+                                        Box::new(Menu::new(vec![
+                                            "Search".to_string(),
+                                            "Feed".to_string(),
+                                            "Exit".to_string()
+                                        ])),
+                                        Vec::default()
+                                    )
+                                    .is_ok()
+                            );
+                        }
+                        MenuContent::MainMenu => {
+                            self.quit = true;
+                        }
+                        MenuContent::Idle => {}
+                    }
+
+                    assert!(self.app.active(&Id::Menu).is_ok());
+                    self.menu_content = MenuContent::MainMenu;
+
                     None
                 }
                 _ => None,

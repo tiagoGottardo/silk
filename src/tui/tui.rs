@@ -22,7 +22,7 @@ pub enum Msg {
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub enum Id {
     Clock,
-    MainMenu,
+    Menu,
     SearchMenu,
     Input,
     Label,

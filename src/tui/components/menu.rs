@@ -137,7 +137,7 @@ impl Component<Msg, NoUserEvent> for Menu {
                     Some(Msg::None)
                 }
             }
-            Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => Some(Msg::AppClose),
+            Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => Some(Msg::Exit),
             _ => Some(Msg::None),
         }
     }
