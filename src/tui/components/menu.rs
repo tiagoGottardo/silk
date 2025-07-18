@@ -69,12 +69,12 @@ impl Component<Msg, NoUserEvent> for Menu {
     fn on(&mut self, ev: Event<NoUserEvent>) -> Option<Msg> {
         match ev {
             Event::Keyboard(KeyEvent {
-                code: Key::Down, ..
+                code: Key::Down | Key::Char('j'), ..
             }) => {
                 self.perform(Cmd::Move(Direction::Down));
                 Some(Msg::None)
             }
-            Event::Keyboard(KeyEvent { code: Key::Up, .. }) => {
+            Event::Keyboard(KeyEvent { code: Key::Up | Key::Char('k'), .. }) => {
                 self.perform(Cmd::Move(Direction::Up));
                 Some(Msg::None)
             }
