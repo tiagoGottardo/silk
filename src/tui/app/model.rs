@@ -134,7 +134,9 @@ where
                             };
 
                             if let Some(url) = url {
-                                let _ = play_video_command(url);
+                                tokio::spawn(async move {
+                                    let _ = play_video_command(url).await;
+                                });
                             }
                         }
                         false => match item.as_str() {
