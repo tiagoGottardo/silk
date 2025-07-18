@@ -17,7 +17,7 @@ use crate::youtube::search_content;
 use super::super::components::{Input, Menu};
 use super::super::tui::{Id, Msg};
 
-pub enum MenuContent {
+pub enum ActiveView {
     SearchResult,
     MainMenu,
     Idle,
@@ -32,7 +32,7 @@ where
     pub redraw: bool,
     pub terminal: TerminalBridge<T>,
     pub search_result: Vec<ContentItem>,
-    pub menu_content: MenuContent,
+    pub active_view: ActiveView,
     pub tx: mpsc::Sender<Msg>,
 }
 
@@ -45,7 +45,7 @@ impl Default for Model<CrosstermTerminalAdapter> {
             redraw: true,
             terminal: TerminalBridge::init_crossterm().expect("Cannot initialize terminal"),
             search_result: Vec::default(),
-            menu_content: MenuContent::MainMenu,
+            active_view: ActiveView::MainMenu,
             tx,
         }
     }
@@ -111,6 +111,24 @@ where
 
         app
     }
+
+    fn go_to_main_menu(&mut self) {
+        assert!(
+            self.app
+                .remount(
+                    Id::Menu,
+                    Box::new(Menu::new(vec![
+                        "Search".to_string(),
+                        "Feed".to_string(),
+                        "Exit".to_string()
+                    ])),
+                    Vec::default()
+                )
+                .is_ok()
+        );
+        self.active_view = ActiveView::MainMenu;
+        assert!(self.app.active(&Id::Menu).is_ok());
+    }
 }
 
 impl<T> Update<Msg> for Model<T>
@@ -123,55 +141,39 @@ where
 
             match msg {
                 Msg::AppClose => {
-                    self.quit = true; // Terminate
-                    None
+                    self.quit = true;
                 }
-                Msg::Clock => None,
-                Msg::MenuSelected(item, idx) => {
-                    match self.menu_content {
-                        MenuContent::SearchResult => {
-                            let mut content_item = self.search_result[idx].clone();
-
-                            tokio::spawn(async move {
-                                content_item.play().await;
-                            });
+                Msg::MenuSelected(item, idx) => match self.active_view {
+                    ActiveView::MainMenu => match item.as_str() {
+                        "Exit" => return Some(Msg::AppClose),
+                        "Search" => {
+                            assert!(self.app.active(&Id::Input).is_ok());
+                            self.active_view = ActiveView::Idle;
                         }
-                        MenuContent::MainMenu => match item.as_str() {
-                            "Exit" => {
-                                self.quit = true;
-                            }
-                            "Search" => {
-                                assert!(self.app.active(&Id::Input).is_ok());
-                                self.menu_content = MenuContent::Idle;
-                            }
-                            "Feed" => {}
-                            _ => {}
-                        },
-                        _ => {} // Should not happen
+                        _ => {}
+                    },
+                    ActiveView::SearchResult => {
+                        let mut content_item = self.search_result[idx].clone();
+                        tokio::spawn(async move {
+                            content_item.play().await;
+                        });
                     }
+                    ActiveView::Idle => {}
+                },
 
-                    None
-                }
                 Msg::Subscribe(_, idx) => {
                     let content_item = &mut self.search_result[idx];
                     let _ = content_item.subscribe();
-
-                    None
                 }
                 Msg::Unsubscribe(_, idx) => {
                     let content_item = &mut self.search_result[idx];
                     let _ = content_item.unsubscribe();
-
-                    None
                 }
-                Msg::Download(_, idx, veido_track) => {
+                Msg::Download(_, idx, video_track) => {
                     let mut content_item = self.search_result[idx].clone();
-
                     tokio::spawn(async move {
-                        content_item.download(veido_track).await;
+                        content_item.download(video_track).await;
                     });
-
-                    None
                 }
                 Msg::Search(input) => {
                     let tx = self.tx.clone();
@@ -180,13 +182,11 @@ where
                             tx.send(Msg::SearchResults(content)).await.ok();
                         }
                     });
-
+                    self.active_view = ActiveView::Idle;
                     assert!(self.app.active(&Id::Menu).is_ok());
-                    None
                 }
                 Msg::SearchResults(content) => {
                     self.search_result = content.clone();
-
                     let menu_items = content
                         .iter()
                         .map(|content_item| match content_item {
@@ -195,49 +195,20 @@ where
                             ContentItem::Playlist(playlist) => playlist.title.clone(),
                         })
                         .collect();
-
-                    self.menu_content = MenuContent::SearchResult;
-
+                    self.active_view = ActiveView::SearchResult;
                     assert!(
                         self.app
                             .remount(Id::Menu, Box::new(Menu::new(menu_items)), Vec::default())
                             .is_ok()
                     );
-
-                    None
                 }
-                Msg::Exit => {
-                    match self.menu_content {
-                        MenuContent::SearchResult => {
-                            assert!(
-                                self.app
-                                    .remount(
-                                        Id::Menu,
-                                        Box::new(Menu::new(vec![
-                                            "Search".to_string(),
-                                            "Feed".to_string(),
-                                            "Exit".to_string()
-                                        ])),
-                                        Vec::default()
-                                    )
-                                    .is_ok()
-                            );
-                        }
-                        MenuContent::MainMenu => {
-                            self.quit = true;
-                        }
-                        MenuContent::Idle => {}
-                    }
-
-                    assert!(self.app.active(&Id::Menu).is_ok());
-                    self.menu_content = MenuContent::MainMenu;
-
-                    None
-                }
-                _ => None,
+                Msg::Exit => match self.active_view {
+                    ActiveView::MainMenu => return Some(Msg::AppClose),
+                    ActiveView::SearchResult | ActiveView::Idle => self.go_to_main_menu(),
+                },
+                _ => {}
             }
-        } else {
-            None
         }
+        None
     }
 }
