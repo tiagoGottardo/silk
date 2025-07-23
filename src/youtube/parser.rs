@@ -1,7 +1,7 @@
+use super::fetch_youtube_content;
+use crate::types::{Channel, ContentItem, Playlist, PlaylistUploader, Video};
 use chrono::{DateTime, Duration, Utc};
 use serde_json::Value;
-use crate::types::{Channel, ContentItem, Playlist, PlaylistUploader, Video};
-use super::fetch_youtube_content;
 
 fn remove_quotes(s: String) -> String {
     let mut chars = s.chars();
@@ -30,7 +30,6 @@ fn parse_time_published(input: &str) -> Option<DateTime<Utc>> {
 
     time_passed.map(|t| Utc::now() - t)
 }
-
 
 pub async fn parse_channel_videos(channel: Channel) -> Result<Vec<Video>, String> {
     let result = fetch_youtube_content(&format!("{}/videos", &channel.url))
@@ -115,10 +114,10 @@ pub fn parse_video_props(renderer: Value) -> Video {
             id: channel_id.clone(),
             username: remove_quotes(renderer["ownerText"]["runs"][0]["text"].to_string()),
             url: format!("https://www.youtube.com/{}", channel_id),
-            tag: String::new()
+            tag: String::new(),
         },
         published_at: Utc::now(), // TODO: get the published_at on search video
-        tag: String::new()
+        tag: String::new(),
     }
 }
 

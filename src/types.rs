@@ -5,6 +5,9 @@ use chrono::{DateTime, Utc};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 
+use crate::config::play_video_command;
+use crate::youtube::download::{DownloadType, download_from_yt};
+
 pub struct ChannelDB {
     pub channel_id: String,
     pub channel_username: String,
@@ -19,7 +22,7 @@ pub struct VideoDB {
     pub channel_username: String,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum ContentItem {
     Video(Video),
     Channel(Channel),
@@ -48,9 +51,28 @@ impl ContentItem {
             _ => {}
         }
     }
+
+    pub async fn download(&mut self, video_track: bool) {
+        let download_type = match video_track {
+            true => DownloadType::Video,
+            false => DownloadType::Audio,
+        };
+
+        match self {
+            ContentItem::Video(v) => v.download(download_type).await,
+            _ => {}
+        }
+    }
+
+    pub async fn play(&mut self) {
+        match self {
+            ContentItem::Video(v) => v.play().await,
+            _ => {}
+        };
+    }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Video {
     pub id: String,
     pub title: String,
@@ -158,9 +180,24 @@ impl Video {
 
         self.tag = tag;
     }
+
+    async fn download(&mut self, download_type: DownloadType) {
+        let url = self.url.clone();
+
+        tokio::task::spawn(async move {
+            let _ = match download_from_yt(&url, download_type).await {
+                Ok(_) => String::from("Downloaded!"),
+                Err(_) => String::from("Some error occur on dowload!"),
+            };
+        });
+    }
+
+    async fn play(&mut self) {
+        let _ = play_video_command(self.url.clone()).await;
+    }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Channel {
     pub id: String,
     pub username: String,
@@ -196,7 +233,7 @@ impl Channel {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Playlist {
     pub id: String,
     pub title: String,
@@ -205,7 +242,7 @@ pub struct Playlist {
     pub uploader: PlaylistUploader,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum PlaylistUploader {
     MultiUploaders(String),
     Channel(Channel),

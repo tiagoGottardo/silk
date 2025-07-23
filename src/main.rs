@@ -3,7 +3,7 @@ use std::error::Error;
 use clap::{Parser, Subcommand};
 use silk::{
     config::{db, env},
-    terminal, ui,
+    terminal, tui,
     youtube::{self, update_feed},
 };
 
@@ -39,7 +39,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             youtube::play_video(&mut terminal, &url).await?;
         }
         None => {
-            ui::main_menu::menu_interface(&mut terminal).await?;
+            tui::tui::main();
         }
     }
 
