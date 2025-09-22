@@ -1,5 +1,4 @@
 use core::fmt;
-use std::borrow::Cow;
 
 use chrono::{DateTime, Utc};
 use ratatui::style::{Color, Modifier, Style};
@@ -7,6 +6,7 @@ use ratatui::text::{Line, Span};
 
 use crate::config::play_video_command;
 use crate::youtube::download::{DownloadType, download_from_yt};
+use crate::youtube::subscribe_to_channel;
 
 pub struct ChannelDB {
     pub channel_id: String,
@@ -48,6 +48,7 @@ impl ContentItem {
     pub async fn subscribe(&mut self) {
         match self {
             ContentItem::Video(v) => v.subscribe().await,
+            ContentItem::Channel(c) => c.subscribe().await,
             _ => {}
         }
     }
@@ -132,30 +133,9 @@ impl Video {
     }
 
     async fn subscribe(&mut self) {
-        let pool = crate::config::db::get();
-        let mut connection = pool.acquire().await.unwrap();
-
-        let result = sqlx::query!(
-            r#"
-                INSERT INTO subscriptions ( channel_id, channel_username ) VALUES ( ?1, ?2 ) "#,
-            self.channel.id,
-            self.channel.username
-        )
-        .execute(&mut *connection)
-        .await;
-
-        let tag = match result {
-            Ok(_) => String::from("Subscribed"),
-            Err(e)
-                if e.as_database_error().map(|e| e.code().unwrap_or_default())
-                    == Some(Cow::Borrowed("1555")) =>
-            {
-                String::from("You're already subscribed to this channel.")
-            }
-            Err(_) => String::from("Some error occur on subscribe"),
-        };
-
-        self.tag = tag;
+        if let Ok(tag) = subscribe_to_channel(&self.channel.id, &self.channel.username).await {
+            self.tag = tag;
+        }
     }
 
     async fn unsubscribe(&mut self) {
@@ -212,6 +192,12 @@ impl Channel {
             username: username.to_string(),
             url: format!("https://www.youtube.com/{}", id.to_string()),
             tag: String::new(),
+        }
+    }
+
+    async fn subscribe(&mut self) {
+        if let Ok(tag) = subscribe_to_channel(&self.id, &self.username).await {
+            self.tag = tag;
         }
     }
 

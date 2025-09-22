@@ -170,3 +170,33 @@ pub async fn get_feed_videos() -> Result<Vec<ContentItem>, String> {
 
     Ok(feed_videos)
 }
+
+pub async fn subscribe_to_channel(
+    channel_id: &str,
+    channel_username: &str,
+) -> Result<String, String> {
+    let pool = crate::config::db::get();
+    let mut connection = pool.acquire().await.unwrap();
+
+    let result = sqlx::query!(
+        r#"
+            INSERT INTO subscriptions ( channel_id, channel_username ) VALUES ( ?1, ?2 ) "#,
+        channel_id,
+        channel_username
+    )
+    .execute(&mut *connection)
+    .await;
+
+    let tag = match result {
+        Ok(_) => String::from("Subscribed"),
+        Err(e)
+            if e.as_database_error().map(|e| e.code().unwrap_or_default())
+                == Some(std::borrow::Cow::Borrowed("1555")) =>
+        {
+            String::from("You're already subscribed to this channel.")
+        }
+        Err(_) => String::from("Some error occur on subscribe"),
+    };
+
+    Ok(tag)
+}
