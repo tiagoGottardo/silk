@@ -162,12 +162,16 @@ where
                 },
 
                 Msg::Subscribe(_, idx) => {
-                    let content_item = &mut self.search_result[idx];
-                    let _ = content_item.subscribe();
+                    let mut content_item = self.search_result[idx].clone();
+                    tokio::spawn(async move {
+                        content_item.subscribe().await;
+                    });
                 }
                 Msg::Unsubscribe(_, idx) => {
-                    let content_item = &mut self.search_result[idx];
-                    let _ = content_item.unsubscribe();
+                    let mut content_item = self.search_result[idx].clone();
+                    tokio::spawn(async move {
+                        content_item.unsubscribe().await;
+                    });
                 }
                 Msg::Download(_, idx, video_track) => {
                     let mut content_item = self.search_result[idx].clone();
