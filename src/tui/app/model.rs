@@ -12,7 +12,7 @@ use tuirealm::terminal::{CrosstermTerminalAdapter, TerminalAdapter, TerminalBrid
 use tuirealm::{Application, EventListenerCfg, Update};
 
 use crate::types::ContentItem;
-use crate::youtube::search_content;
+use crate::youtube::{get_feed_videos, search_content, update_feed};
 
 use super::super::components::{Input, Menu};
 use super::super::tui::{Id, Msg};
@@ -149,6 +149,17 @@ where
                         "Search" => {
                             assert!(self.app.active(&Id::Input).is_ok());
                             self.active_view = ActiveView::Idle;
+                        }
+                        "Feed" => {
+                            let tx = self.tx.clone();
+                            tokio::spawn(async move {
+                                let _ = update_feed().await;
+                                if let Ok(content) = get_feed_videos().await {
+                                    tx.send(Msg::SearchResults(content)).await.ok();
+                                }
+                            });
+                            self.active_view = ActiveView::Idle;
+                            assert!(self.app.active(&Id::Menu).is_ok());
                         }
                         _ => {}
                     },
