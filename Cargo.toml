@@ -18,4 +18,6 @@ sqlx = { version = "0.8.6", features = ["sqlite", "runtime-tokio"]}
 dotenvy = "0.15.7"
 chrono = "0.4.41"
 unicode-segmentation = "1.10.0"
+log = "0.4.22"
+fern = "0.6.2"
 
