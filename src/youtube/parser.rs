@@ -84,7 +84,7 @@ pub fn parse_contents(contents: Vec<Value>) -> Vec<ContentItem> {
 
 pub fn parse_channel_props(renderer: Value) -> Channel {
     Channel {
-        id: remove_quotes(renderer["channelId"].to_string()),
+        id: remove_quotes(renderer["subscriberCountText"]["simpleText"].to_string()),
         username: remove_quotes(renderer["title"]["simpleText"].to_string()),
         url: format!(
             "https://www.youtube.com{}",
@@ -138,7 +138,7 @@ pub fn parse_playlist_props(renderer: Value) -> Playlist {
         channel_id => PlaylistUploader::Channel(
             Channel {
                 id: remove_first_char(remove_quotes(channel_id.to_string())),
-                username: 
+                username:
                     remove_quotes(
                         renderer["metadata"]["lockupMetadataViewModel"]["metadata"]["contentMetadataViewModel"]["metadataRows"][0]["metadataParts"][0]["text"]["content"]
                             .to_string(),
