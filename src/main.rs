@@ -7,6 +7,22 @@ use silk::{
     youtube::{self, update_feed},
 };
 
+fn setup_logger() -> Result<(), fern::InitError> {
+    fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "[{} {}] {}",
+                record.level(),
+                record.target(),
+                message
+            ))
+        })
+        .level(log::LevelFilter::Debug)
+        .chain(fern::log_file("debug.log")?)
+        .apply()?;
+    Ok(())
+}
+
 #[derive(Parser)]
 #[command(name = "silk")]
 struct Cli {
@@ -25,6 +41,8 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    setup_logger()?;
+
     env::Env::init();
     db::init().await;
 
