@@ -14,14 +14,24 @@ pub async fn download_from_yt(url: &str, download_type: DownloadType) -> Result<
         _ => format!("https://www.youtube.com/{}", url),
     };
 
-    let (path, format) = match download_type {
-        DownloadType::Video => (VIDEO_DOWNLOAD_PATH, "best[ext=mp4]/best"),
-        DownloadType::Audio => (AUDIO_DOWNLOAD_PATH, "233"),
+    let path = match download_type {
+        DownloadType::Video => VIDEO_DOWNLOAD_PATH,
+        DownloadType::Audio => AUDIO_DOWNLOAD_PATH,
     };
 
-    Command::new("yt-dlp")
-        .args(["-P", path, "-f", format, &normalized_url])
-        .output()?;
+    let mut cmd = Command::new("yt-dlp");
+    cmd.arg("-P")
+        .arg(path)
+        .arg("-f")
+        .arg("best[ext=mp4]/best")
+        .arg("--no-playlist")
+        .arg(&normalized_url);
+
+    if let DownloadType::Audio = download_type {
+        cmd.arg("--extract-audio").arg("--audio-format").arg("mp3");
+    }
+
+    cmd.output()?;
 
     Ok(())
 }
